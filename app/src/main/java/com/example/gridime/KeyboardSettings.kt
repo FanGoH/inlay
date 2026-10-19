@@ -59,7 +59,7 @@ enum class KeyShape(val label: String, val radiusDp: Float) {
  * The physical buttons, named by Android's keycodes.
  * A = bottom face button, B = right, X = left, Y = top (Xbox positions).
  */
-enum class ControllerButton { A, B, X, Y, L1, R1, L2, R2, SELECT, START, L3 }
+enum class ControllerButton { A, B, X, Y, L1, R1, L2, R2, SELECT, START, L3, R3 }
 
 /** A key colour set: keyboard background, letter keys, special keys. */
 data class Tone(val name: String, val background: Int, val key: Int, val special: Int)
@@ -120,6 +120,12 @@ data class KeyboardSettings(
     val selectAllButton: Boolean = false,
     val doubleSpacePeriod: Boolean = true,
     val undoCombo: Boolean = true,
+    // Dual-stick Absolute Selection (opt-in; Disabled keeps Classic navigation)
+    val dualStickMode: DualStickActivationMode = DualStickActivationMode.DISABLED,
+    val dualStickButton: ControllerButton = ControllerButton.R3,
+    val dualStickDeadzone: Int = 3,     // 0 tight to 10 wide
+    val dualStickCurve: DualStickCurve = DualStickCurve.LINEAR,
+    val dualStickKeepLast: Boolean = false,
     // Sound & haptics
     val vibration: Boolean = true,
     val moveStrength: Int = 5,          // 0 to 10
@@ -166,6 +172,11 @@ data class KeyboardSettings(
             .putBoolean(K_SILENT, soundInSilent)
             .putBoolean(K_CLIP_HISTORY, saveClipHistory)
             .putBoolean(K_PREVIEW, showPreview)
+            .putString(K_DUAL_MODE, dualStickMode.name)
+            .putString(K_DUAL_BUTTON, dualStickButton.name)
+            .putInt(K_DUAL_DEADZONE, dualStickDeadzone)
+            .putString(K_DUAL_CURVE, dualStickCurve.name)
+            .putBoolean(K_DUAL_KEEP, dualStickKeepLast)
             .apply()
     }
 
@@ -199,6 +210,11 @@ data class KeyboardSettings(
         private const val K_SILENT = "sound_in_silent"
         private const val K_CLIP_HISTORY = "save_clip_history"
         private const val K_PREVIEW = "show_preview"
+        private const val K_DUAL_MODE = "dual_stick_mode"
+        private const val K_DUAL_BUTTON = "dual_stick_button"
+        private const val K_DUAL_DEADZONE = "dual_stick_deadzone"
+        private const val K_DUAL_CURVE = "dual_stick_curve"
+        private const val K_DUAL_KEEP = "dual_stick_keep_last"
 
         fun load(context: Context): KeyboardSettings {
             val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -229,12 +245,20 @@ data class KeyboardSettings(
                 moveSounds = p.getBoolean(K_MOVE_SOUNDS, d.moveSounds),
                 soundInSilent = p.getBoolean(K_SILENT, d.soundInSilent),
                 saveClipHistory = p.getBoolean(K_CLIP_HISTORY, d.saveClipHistory),
-                showPreview = p.getBoolean(K_PREVIEW, d.showPreview)
+                showPreview = p.getBoolean(K_PREVIEW, d.showPreview),
+                dualStickMode = enumOr(p.getString(K_DUAL_MODE, null), d.dualStickMode),
+                dualStickButton = sanitiseDualStickButton(enumOr(p.getString(K_DUAL_BUTTON, null), d.dualStickButton)),
+                dualStickDeadzone = p.getInt(K_DUAL_DEADZONE, d.dualStickDeadzone),
+                dualStickCurve = enumOr(p.getString(K_DUAL_CURVE, null), d.dualStickCurve),
+                dualStickKeepLast = p.getBoolean(K_DUAL_KEEP, d.dualStickKeepLast)
             )
         }
 
         private inline fun <reified T : Enum<T>> enumOr(name: String?, fallback: T): T =
             name?.let { n -> enumValues<T>().firstOrNull { it.name == n } } ?: fallback
+
+        private fun sanitiseDualStickButton(button: ControllerButton): ControllerButton =
+            if (button in DUAL_STICK_ACTIVATION_BUTTONS) button else ControllerButton.R3
     }
 }
 

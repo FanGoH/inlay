@@ -148,6 +148,11 @@ class KeyGridView(context: Context) : View(context) {
     private var selectedCount = 0
     private var clipPreview: String? = null
     private var clips: List<String> = emptyList()
+    private var dualStickActive = false
+    private var leftAnalog = AnalogSelection.Inactive
+    private var rightAnalog = AnalogSelection.Inactive
+    private var dualFade = 0f
+    private var dualAnim: ValueAnimator? = null
 
     /**
      * Column memory: where you were aiming horizontally when you started moving up
@@ -419,6 +424,66 @@ class KeyGridView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun setDualStickActive(on: Boolean) {
+        if (dualStickActive == on) return
+        dualStickActive = on
+        if (!on) {
+            leftAnalog = AnalogSelection.Inactive
+            rightAnalog = AnalogSelection.Inactive
+        }
+        fadeDual(on)
+        invalidate()
+    }
+
+    fun setAnalogSelections(left: AnalogSelection, right: AnalogSelection) {
+        leftAnalog = left
+        rightAnalog = right
+        invalidate()
+    }
+
+    fun snapshotKeys(): List<MappedKey> {
+        val rows = allRows()
+        return rows.flatMapIndexed { r, row ->
+            row.mapIndexed { c, _ ->
+                val rect = keyRect(r, row, c)
+                MappedKey(keyId(r, c), rect.left, rect.top, rect.right, rect.bottom)
+            }
+        }
+    }
+
+    fun keyboardBounds(): KeyboardRegion {
+        return AbsoluteKeyMapper.boundsOf(snapshotKeys())
+            ?: KeyboardRegion(contentLeft(), edge, contentLeft() + contentWidth(), height.toFloat() - edge)
+    }
+
+    fun pressKeyById(id: String): Boolean {
+        val rows = allRows()
+        rows.forEachIndexed { r, row ->
+            row.forEachIndexed { c, key ->
+                if (keyId(r, c) == id) {
+                    press(key)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun keyId(row: Int, col: Int) = "$row:$col"
+
+    private fun fadeDual(show: Boolean) {
+        dualAnim?.cancel()
+        dualAnim = ValueAnimator.ofFloat(dualFade, if (show) 1f else 0f).apply {
+            duration = Design.MOTION_FADE
+            interpolator = easeOut
+            addUpdateListener {
+                dualFade = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
     fun setClipPreview(text: String?) {
         clipPreview = text
             ?.replace('\n', ' ')
@@ -528,49 +593,63 @@ class KeyGridView(context: Context) : View(context) {
             focusReady = true
         }
 
-        // 1. Key backgrounds (the tool strip fades out while the RT chips show)
+        // 1. Key backgrounds (the tool strip fades out while hint chips show)
+        val stripFade = max(comboFade, dualFade)
         rows.forEachIndexed { r, row ->
-            if (r == 0 && comboFade >= 1f) return@forEachIndexed
+            if (r == 0 && stripFade >= 1f) return@forEachIndexed
             row.forEachIndexed { c, key ->
                 val bg = backgroundFor(key) ?: return@forEachIndexed
-                fillPaint.color = if (r == 0) fade(bg, 1f - comboFade) else bg
+                fillPaint.color = if (r == 0) fade(bg, 1f - stripFade) else bg
                 canvas.drawRoundRect(keyRect(r, row, c), corner, corner, fillPaint)
             }
         }
 
-        // 2. The gliding highlight, in the chosen style
-        drawHighlight(canvas)
+        // 2. Classic highlight, or the two dual-stick highlights
+        if (dualStickActive) {
+            drawAnalogHighlight(canvas, leftAnalog, colAccent, colGlow)
+            drawAnalogHighlight(canvas, rightAnalog, rightAccent, rightGlow)
+        } else {
+            drawHighlight(canvas)
+        }
 
         // 3. Labels, icons, badges
         iconPaint.strokeWidth = u(Design.STROKE_ICON)
         rows.forEachIndexed { r, row ->
-            val alpha = if (r == 0) 1f - comboFade else 1f
+            val alpha = if (r == 0) 1f - stripFade else 1f
             if (alpha <= 0f) return@forEachIndexed
             val layerSaved = if (alpha < 1f) canvas.saveLayerAlpha(stripRect(), (alpha * 255).roundToInt()) else -1
             row.forEachIndexed { c, key ->
-                val focused = r == selRow && c == selCol
+                val focused = isKeyFocused(r, c)
                 val rect = keyRect(r, row, c)
                 if (focused && style == HighlightStyle.LIFT) {
                     // Lift: the label grows with its key
                     val saved = canvas.save()
                     canvas.scale(LIFT_SCALE, LIFT_SCALE, rect.centerX(), rect.centerY())
-                    drawKeyContent(canvas, key, rect, focused = true)
+                    drawKeyContent(canvas, key, rect, focused = true, row = r, col = c)
                     canvas.restoreToCount(saved)
                 } else {
-                    drawKeyContent(canvas, key, rect, focused)
+                    drawKeyContent(canvas, key, rect, focused, r, c)
                 }
             }
             if (layerSaved >= 0) canvas.restoreToCount(layerSaved)
         }
 
-        // 4. RT combo chips, faded in over the tool strip
-        if (comboFade > 0f) {
-            val saved = canvas.saveLayerAlpha(stripRect(), (comboFade * 255).roundToInt())
-            drawChips(canvas, stripRect(), colBackground, comboChips())
+        // 4. Dual-stick aim dots (stick position, not a key)
+        if (dualStickActive) {
+            drawAim(canvas, leftAnalog, colAccent)
+            drawAim(canvas, rightAnalog, rightAccent)
+        }
+
+        // 5. RT combo chips, or dual-stick confirm chips, over the tool strip
+        val chipAlpha = max(comboFade, if (comboFade <= 0f) dualFade else 0f)
+        if (chipAlpha > 0f) {
+            val chips = if (comboFade > 0f) comboChips() else dualChips()
+            val saved = canvas.saveLayerAlpha(stripRect(), (chipAlpha * 255).roundToInt())
+            drawChips(canvas, stripRect(), colBackground, chips)
             canvas.restoreToCount(saved)
         }
 
-        // 5. Button guide under the clipboard cards
+        // 6. Button guide under the clipboard cards
         if (layer == Layer.CLIPS && settings.showHints) {
             val top = rowTop(4)
             drawChips(
@@ -623,29 +702,35 @@ class KeyGridView(context: Context) : View(context) {
             HighlightStyle.LIFT -> Contrast.over(Contrast.withAlpha(colAccent, 0x52), colKey)
         }
 
-    private fun drawHighlight(canvas: Canvas) {
+    private fun drawHighlight(
+        canvas: Canvas,
+        rect: RectF = focusRect,
+        accent: Int = colAccent,
+        glow: Int = colGlow,
+        fill: Int = focusFill
+    ) {
         val lift = if (style == HighlightStyle.LIFT) LIFT_SCALE else 1f
-        val cx = focusRect.centerX()
-        val cy = focusRect.centerY()
-        val hw = focusRect.width() / 2f * pressScale * lift
-        val hh = focusRect.height() / 2f * pressScale * lift
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val hw = rect.width() / 2f * pressScale * lift
+        val hh = rect.height() / 2f * pressScale * lift
         val pill = RectF(cx - hw, cy - hh, cx + hw, cy + hh)
         val r = corner * lift
 
         if (style == HighlightStyle.GLOW) {
             val grow = u(2.5f)
-            ringPaint.color = colGlow
+            ringPaint.color = glow
             ringPaint.strokeWidth = u(2f)
             canvas.drawRoundRect(RectF(pill).apply { inset(-grow, -grow) }, r + grow, r + grow, ringPaint)
         }
-        fillPaint.color = focusFill
+        fillPaint.color = fill
         canvas.drawRoundRect(pill, r, r, fillPaint)
 
         when (style) {
             HighlightStyle.OUTLINE -> {
                 // A ring just outside the key, with a hairline gap so it reads on any key colour
                 val gapOut = u(2.5f)
-                ringPaint.color = colAccent
+                ringPaint.color = accent
                 ringPaint.strokeWidth = u(2f)
                 canvas.drawRoundRect(RectF(pill).apply { inset(-gapOut, -gapOut) }, r + gapOut, r + gapOut, ringPaint)
             }
@@ -654,17 +739,64 @@ class KeyGridView(context: Context) : View(context) {
                 val barW = pill.width() * 0.28f
                 val barH = u(2.5f)
                 val barY = pill.bottom - u(5f)
-                fillPaint.color = colAccent
+                fillPaint.color = accent
                 canvas.drawRoundRect(cx - barW / 2, barY - barH, cx + barW / 2, barY, barH, barH, fillPaint)
             }
             else -> Unit
         }
     }
 
-    private fun visibleBg(key: Key, focused: Boolean): Int {
-        if (focused) return focusFill
+    private val rightAccent: Int get() = secondaryAccent(colAccent)
+    private val rightGlow: Int get() = Contrast.withAlpha(rightAccent, 0x59)
+
+    private fun isKeyFocused(row: Int, col: Int): Boolean {
+        if (!dualStickActive) return row == selRow && col == selCol
+        val id = keyId(row, col)
+        return (leftAnalog.active && leftAnalog.selectedKeyId == id) ||
+            (rightAnalog.active && rightAnalog.selectedKeyId == id)
+    }
+
+    private fun analogFocusFill(accent: Int): Int = when (style) {
+        HighlightStyle.GLOW, HighlightStyle.SOLID -> accent
+        HighlightStyle.OUTLINE -> Contrast.over(Contrast.withAlpha(Color.WHITE, 0x1F), colKey)
+        HighlightStyle.LIFT -> Contrast.over(Contrast.withAlpha(accent, 0x52), colKey)
+    }
+
+    private fun drawAnalogHighlight(canvas: Canvas, selection: AnalogSelection, accent: Int, glow: Int) {
+        if (!selection.active) return
+        val id = selection.selectedKeyId ?: return
+        val rect = rectForId(id) ?: return
+        drawHighlight(canvas, rect, accent, glow, analogFocusFill(accent))
+    }
+
+    private fun drawAim(canvas: Canvas, selection: AnalogSelection, accent: Int) {
+        if (!selection.active) return
+        fillPaint.color = Contrast.withAlpha(accent, 0xC0)
+        canvas.drawCircle(selection.x, selection.y, u(2.5f), fillPaint)
+    }
+
+    private fun rectForId(id: String): RectF? {
+        val rows = allRows()
+        rows.forEachIndexed { r, row ->
+            row.forEachIndexed { c, _ ->
+                if (keyId(r, c) == id) return keyRect(r, row, c)
+            }
+        }
+        return null
+    }
+
+    private fun visibleBg(key: Key, focused: Boolean, row: Int = selRow, col: Int = selCol): Int {
+        if (focused) return focusFillFor(row, col)
         val bg = backgroundFor(key) ?: return colBackground
         return if (Color.alpha(bg) == 255) bg else Contrast.over(bg, colBackground)
+    }
+
+    private fun focusFillFor(row: Int, col: Int): Int {
+        if (!dualStickActive) return focusFill
+        val id = keyId(row, col)
+        val rightOnly = rightAnalog.active && rightAnalog.selectedKeyId == id &&
+            !(leftAnalog.active && leftAnalog.selectedKeyId == id)
+        return analogFocusFill(if (rightOnly) rightAccent else colAccent)
     }
 
     /** The accent colour if readable on this background, otherwise plain ink. */
@@ -673,8 +805,8 @@ class KeyGridView(context: Context) : View(context) {
 
     private val undoOnDelete get() = heldShift && settings.undoCombo
 
-    private fun drawKeyContent(canvas: Canvas, key: Key, rect: RectF, focused: Boolean) {
-        val bg = visibleBg(key, focused)
+    private fun drawKeyContent(canvas: Canvas, key: Key, rect: RectF, focused: Boolean, row: Int = selRow, col: Int = selCol) {
+        val bg = visibleBg(key, focused, row, col)
         val ink = Contrast.inkFor(bg)
         val soft = Contrast.withAlpha(ink, 175)
         val cx = rect.centerX()
@@ -713,6 +845,13 @@ class KeyGridView(context: Context) : View(context) {
         listOf(HintPart.Badge(ControllerButton.L1), HintPart.Badge(ControllerButton.R1), HintPart.Text("Jump word")),
         listOf(HintPart.Badge(ControllerButton.A), HintPart.Text("Capital")),
         if (settings.undoCombo) listOf(HintPart.Badge(ControllerButton.X), HintPart.Text("Undo")) else null
+    )
+
+    /** Shown over the tool strip while Dual-stick Absolute Selection is on. */
+    private fun dualChips(): List<List<HintPart>> = listOf(
+        listOf(HintPart.Badge(ControllerButton.L1), HintPart.Text("Left")),
+        listOf(HintPart.Badge(ControllerButton.R1), HintPart.Text("Right")),
+        listOf(HintPart.Badge(ControllerButton.A), HintPart.Text("Last"))
     )
 
     /** Shown on the space bar in select mode, most useful first. */

@@ -52,6 +52,8 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
     private val stick = StickDirection()
     private var hatDx = 0
     private var hatDy = 0
+    private val dualActivation = DualStickActivation()
+    private val dualSticks = DualStickController()
 
     // Triggers. L2 = letters/symbols. R2 tap = shift, R2 hold = modifier.
     private var leftTriggerDown = false
@@ -63,6 +65,7 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
 
     private var lastSpaceTime = 0L
     private var bConsumed = false
+    private var lastActivationEdge = 0L
 
     // =====================================================================
     // LIFECYCLE
@@ -136,6 +139,7 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
         selStart = info?.initialSelStart?.coerceAtLeast(0) ?: 0
         selEnd = info?.initialSelEnd?.coerceAtLeast(0) ?: 0
         exitSelectMode(collapse = false)
+        leaveDualStick()
         refreshAutoShift()
         updateClipPreview()
     }
@@ -162,6 +166,7 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
         rightTriggerDown = false
         leftTriggerDown = false
         gridView?.setHeldShift(false)
+        leaveDualStick()
     }
 
     override fun onUpdateSelection(
@@ -438,24 +443,35 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
         if (grid == null || !isInputViewShown) return super.onKeyDown(keyCode, event)
         // Held buttons repeat on our own timers, so Android's repeats are ignored
         val first = event.repeatCount == 0
+        val dual = dualActivation.active
+
+        if (handleActivationDown(keyCode, repeat = !first)) return true
 
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> if (first) startNav(0, -1, fromStick = false)
-            KeyEvent.KEYCODE_DPAD_DOWN -> if (first) startNav(0, 1, fromStick = false)
-            KeyEvent.KEYCODE_DPAD_LEFT -> if (first) startNav(-1, 0, fromStick = false)
-            KeyEvent.KEYCODE_DPAD_RIGHT -> if (first) startNav(1, 0, fromStick = false)
+            KeyEvent.KEYCODE_DPAD_UP -> if (first && !dual) startNav(0, -1, fromStick = false)
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (first && !dual) startNav(0, 1, fromStick = false)
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (first) {
+                if (dual) startCursor(-1) else startNav(-1, 0, fromStick = false)
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (first) {
+                if (dual) startCursor(1) else startNav(1, 0, fromStick = false)
+            }
 
             KeyEvent.KEYCODE_BUTTON_A -> if (first) {
                 if (r2Held) r2UsedAsModifier = true
-                grid.pressSelected()
+                if (dual) confirmLastStick() else grid.pressSelected()
             }
             KeyEvent.KEYCODE_BUTTON_X -> if (first) onXButton(grid)
             KeyEvent.KEYCODE_BUTTON_Y -> if (first) {
                 feedback.space()
                 onText(" ")
             }
-            KeyEvent.KEYCODE_BUTTON_L1 -> if (first) startCursor(-1)
-            KeyEvent.KEYCODE_BUTTON_R1 -> if (first) startCursor(1)
+            KeyEvent.KEYCODE_BUTTON_L1 -> if (first) {
+                if (dual && !r2Held) confirmStick(DualStickSide.LEFT) else startCursor(-1)
+            }
+            KeyEvent.KEYCODE_BUTTON_R1 -> if (first) {
+                if (dual && !r2Held) confirmStick(DualStickSide.RIGHT) else startCursor(1)
+            }
             KeyEvent.KEYCODE_BUTTON_L2 -> if (first) onL2()
             KeyEvent.KEYCODE_BUTTON_R2 -> if (first) r2Down()
             KeyEvent.KEYCODE_BUTTON_SELECT -> if (first) onSelectButton()
@@ -486,9 +502,13 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (gridView == null || !isInputViewShown) return super.onKeyUp(keyCode, event)
+        if (handleActivationUp(keyCode)) return true
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> stopNav()
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                stopNav()
+                if (dualActivation.active) cursorRepeater.stop()
+            }
             KeyEvent.KEYCODE_BUTTON_X -> deleteRepeater.stop()
             KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1 -> cursorRepeater.stop()
             KeyEvent.KEYCODE_BUTTON_R2 -> r2Up()
@@ -558,7 +578,12 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
         if (!event.isFromSource(InputDevice.SOURCE_JOYSTICK)) return false
         if (event.action == MotionEvent.ACTION_MOVE) {
             readTriggers(event)
-            readDirections(event)
+            if (dualActivation.active) {
+                readAbsoluteSticks(event)
+                readHatAsCursor(event)
+            } else {
+                readDirections(event)
+            }
         }
         // Claim every joystick sample. If any slipped through, Android would turn
         // it into its own D-pad presses and the highlight would jump twice.
@@ -570,16 +595,17 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
         val rt = max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS))
         if (!leftTriggerDown && lt > TRIGGER_PRESS) {
             leftTriggerDown = true
-            onL2()
+            if (!handleActivationDown(KeyEvent.KEYCODE_BUTTON_L2, repeat = false)) onL2()
         } else if (leftTriggerDown && lt < TRIGGER_RELEASE) {
             leftTriggerDown = false
+            if (!handleActivationUp(KeyEvent.KEYCODE_BUTTON_L2)) Unit
         }
         if (!rightTriggerDown && rt > TRIGGER_PRESS) {
             rightTriggerDown = true
-            r2Down()
+            if (!handleActivationDown(KeyEvent.KEYCODE_BUTTON_R2, repeat = false)) r2Down()
         } else if (rightTriggerDown && rt < TRIGGER_RELEASE) {
             rightTriggerDown = false
-            r2Up()
+            if (!handleActivationUp(KeyEvent.KEYCODE_BUTTON_R2)) r2Up()
         }
     }
 
@@ -600,6 +626,120 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
             stick.dx != 0 || stick.dy != 0 -> startNav(stick.dx, stick.dy, fromStick = true)
             else -> stopNav()
         }
+    }
+
+    private fun readAbsoluteSticks(event: MotionEvent) {
+        val grid = gridView ?: return
+        val keys = grid.snapshotKeys()
+        val bounds = grid.keyboardBounds()
+        val (leftRegion, rightRegion) = AbsoluteKeyMapper.splitRegions(bounds)
+        val deadzone = AnalogStickMath.deadzoneFromSlider(settings.dualStickDeadzone)
+        val (rx, ry) = AnalogStickMath.pickRightStick(
+            event.getAxisValue(MotionEvent.AXIS_Z),
+            event.getAxisValue(MotionEvent.AXIS_RZ),
+            event.getAxisValue(MotionEvent.AXIS_RX),
+            event.getAxisValue(MotionEvent.AXIS_RY)
+        )
+        val leftChanged = dualSticks.update(
+            DualStickSide.LEFT,
+            event.getAxisValue(MotionEvent.AXIS_X),
+            event.getAxisValue(MotionEvent.AXIS_Y),
+            keys, leftRegion, deadzone, settings.dualStickCurve, settings.dualStickKeepLast
+        )
+        val rightChanged = dualSticks.update(
+            DualStickSide.RIGHT, rx, ry,
+            keys, rightRegion, deadzone, settings.dualStickCurve, settings.dualStickKeepLast
+        )
+        if (leftChanged || rightChanged) {
+            if ((leftChanged && dualSticks.left.active) || (rightChanged && dualSticks.right.active)) {
+                feedback.move()
+            }
+            grid.setAnalogSelections(dualSticks.left, dualSticks.right)
+        }
+    }
+
+    /** While Dual-stick is on, the hat only edits text so it cannot drift the old highlight. */
+    private fun readHatAsCursor(event: MotionEvent) {
+        val hx = hatValue(event.getAxisValue(MotionEvent.AXIS_HAT_X))
+        val hy = hatValue(event.getAxisValue(MotionEvent.AXIS_HAT_Y))
+        val hatChanged = hx != hatDx || hy != hatDy
+        hatDx = hx
+        hatDy = hy
+        if (!hatChanged) return
+        when {
+            hatDx != 0 -> startCursor(hatDx)
+            else -> cursorRepeater.stop()
+        }
+    }
+
+    private fun isActivationKey(keyCode: Int): Boolean =
+        settings.dualStickMode != DualStickActivationMode.DISABLED &&
+            keyCode == settings.dualStickButton.toKeyCode()
+
+    /** True when the activation button ate the event (so it cannot type or retrigger). */
+    private fun handleActivationDown(keyCode: Int, repeat: Boolean): Boolean {
+        if (!isActivationKey(keyCode)) return false
+        if (repeat) {
+            dualActivation.onKeyDown(settings.dualStickMode, true, repeat = true)
+            return true
+        }
+        val now = SystemClock.uptimeMillis()
+        if (now - lastActivationEdge < TRIGGER_DEDUPE_MS) return true
+        lastActivationEdge = now
+        applyActivation(dualActivation.onKeyDown(settings.dualStickMode, true, repeat = false))
+        return true
+    }
+
+    private fun handleActivationUp(keyCode: Int): Boolean {
+        if (!isActivationKey(keyCode)) return false
+        applyActivation(dualActivation.onKeyUp(settings.dualStickMode, true))
+        return true
+    }
+
+    /** Returns true when the event must not fall through to Classic actions. */
+    private fun applyActivation(transition: DualStickTransition): Boolean {
+        when (transition) {
+            DualStickTransition.IGNORED -> return false
+            DualStickTransition.CONSUMED -> return true
+            DualStickTransition.ACTIVATED -> enterDualStick()
+            DualStickTransition.DEACTIVATED -> leaveDualStick(fromActivation = true)
+        }
+        return true
+    }
+
+    private fun enterDualStick() {
+        stopNav()
+        cursorRepeater.stop()
+        stick.reset()
+        hatDx = 0
+        hatDy = 0
+        dualSticks.reset()
+        gridView?.setDualStickActive(true)
+        feedback.on()
+    }
+
+    private fun leaveDualStick(fromActivation: Boolean = false) {
+        if (fromActivation || dualActivation.active) {
+            if (dualActivation.active) dualActivation.cancel()
+            feedback.off()
+        } else {
+            dualActivation.reset()
+        }
+        dualSticks.reset()
+        stopNav()
+        stick.reset()
+        gridView?.setDualStickActive(false)
+    }
+
+    private fun confirmStick(side: DualStickSide) {
+        val id = dualSticks.selection(side).selectedKeyId ?: return
+        if (!dualSticks.selection(side).active) return
+        gridView?.pressKeyById(id)
+    }
+
+    private fun confirmLastStick() {
+        val side = dualSticks.confirmSide() ?: return
+        confirmStick(side)
     }
 
     private fun hatValue(v: Float) = if (v > 0.5f) 1 else if (v < -0.5f) -1 else 0

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 — Dual-stick Absolute Selection
+
+Optional SteamOS-style aiming with both analog sticks. Classic D-pad / left-stick navigation is unchanged until you turn this on.
+
+- **Disabled / Hold / Toggle.** Off by default. Hold is on only while the activation button is down. Toggle is one press in, one press out. Key-repeat never toggles.
+- **Default activation is RS (R3)**, which Classic Inlay does not use. The activation button never types a character.
+- **Absolute mapping** from each stick onto the live key rectangles (staggered Classic rows, wide Space, layout and size changes).
+- **LB / RB type** the left / right selection. **A** types the last key you aimed at. Stick movement never inserts text.
+- Shift, symbols, delete, space, enter, clipboard and word-jump (`RT` + `LB` / `RB`) stay available.
+- Settings persist. Unit tests cover mapping, deadzones and activation transitions.
+
+See `docs/dual-stick.md` for Thor / Odin testing notes and platform limits.
+
 ## 1.0.0 — First release
 
 The first public version of Inlay: a controller-first keyboard for Android handhelds.

@@ -391,6 +391,29 @@ class SettingsActivity : Activity() {
                 update(settings.copy(stickSpeed = it))
             }
         )),
+        Section("Dual-stick selection", listOf(
+            ChoiceRow(this, "Activation", "Off keeps Classic navigation. Hold is on only while the button is down. Toggle is one press in, one press out",
+                DualStickActivationMode.values().map { it.label }, settings.dualStickMode.ordinal) {
+                update(settings.copy(dualStickMode = DualStickActivationMode.values()[it]))
+            },
+            ChoiceRow(this, "Activation button", "Default is {R3}, which Classic Inlay does not use. The button never types a character",
+                DUAL_STICK_ACTIVATION_BUTTONS.map { it.activationLabel() },
+                DUAL_STICK_ACTIVATION_BUTTONS.indexOf(settings.dualStickButton).coerceAtLeast(0)) {
+                update(settings.copy(dualStickButton = DUAL_STICK_ACTIVATION_BUTTONS[it]))
+            },
+            SliderRow(this, "Stick deadzone", "How far you have to push before a key is selected",
+                0, 10, settings.dualStickDeadzone, { DEADZONE_LABELS[it] }) {
+                update(settings.copy(dualStickDeadzone = it))
+            },
+            ChoiceRow(this, "Stick response", "Soft stays precise near the centre. Sharp reaches the edges sooner",
+                DualStickCurve.values().map { it.label }, settings.dualStickCurve.ordinal) {
+                update(settings.copy(dualStickCurve = DualStickCurve.values()[it]))
+            },
+            ToggleRow(this, "Remember last key", "When off, letting a stick return to centre clears its selection",
+                settings.dualStickKeepLast) {
+                update(settings.copy(dualStickKeepLast = it))
+            }
+        )),
         Section("Hints", listOf(
             ToggleRow(this, "Button icons on keys", "Small {X} {Y} style badges in the key corners",
                 settings.showHints) {
@@ -490,6 +513,25 @@ class SettingsActivity : Activity() {
             GuideRow(this, "Select everything", "{SELECTx2}")
         )
         if (settings.undoCombo) editing += GuideRow(this, "Undo", "{R2} + {X}")
+        val dual = if (settings.dualStickMode == DualStickActivationMode.DISABLED) {
+            emptyList()
+        } else {
+            val arm = settings.dualStickButton.name.let { "{$it}" }
+            val how = if (settings.dualStickMode == DualStickActivationMode.HOLD) {
+                "Hold $arm"
+            } else {
+                "Press $arm"
+            }
+            listOf(
+                Section("Dual-stick selection", listOf(
+                    GuideRow(this, if (settings.dualStickMode == DualStickActivationMode.HOLD) "Hold to aim both sticks" else "Turn Dual-stick on or off", how),
+                    GuideRow(this, "Type the left-stick key", "{L1}"),
+                    GuideRow(this, "Type the right-stick key", "{R1}"),
+                    GuideRow(this, "Type the last key you aimed at", "{A}"),
+                    GuideRow(this, "Move the text cursor", "D-pad · {R2} + {L1} {R1}")
+                ))
+            )
+        }
         return listOf(
             Section("Typing", listOf(
                 GuideRow(this, "Type the highlighted key", "{A}"),
@@ -505,7 +547,7 @@ class SettingsActivity : Activity() {
                 GuideRow(this, "Close the keyboard", "{B}"),
                 GuideRow(this, "Change keyboard size", "{L3}")
             ))
-        )
+        ) + dual
     }
 
     private fun aboutPage() = listOf(
@@ -519,7 +561,8 @@ class SettingsActivity : Activity() {
         )),
         Section("Inlay", listOfNotNull(
             InfoRow(this, "Version", appVersion()),
-            InfoRow(this, "Licence", "Free and open source"),
+            InfoRow(this, "This build", "FanGoH fork · optional Dual-stick Absolute Selection"),
+            InfoRow(this, "Licence", "GNU GPL-3.0"),
             SOURCE_URL.takeIf { it.isNotEmpty() }?.let { url ->
                 ActionRow(this, "Source code", "See how it's made, report a problem or suggest an idea") {
                     runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
@@ -545,7 +588,11 @@ class SettingsActivity : Activity() {
         const val MAX_CONTENT_WIDTH = 720f
         const val CLOSE_DELAY_MS = 140L
         /** The project's web page (e.g. on GitHub). Leave empty to hide the "Source code" row. */
-        const val SOURCE_URL = "https://github.com/dakingeman/inlay"
+        const val SOURCE_URL = "https://github.com/FanGoH/inlay"
         val STICK_LABELS = listOf("Slowest", "Slow", "Medium", "Fast", "Fastest")
+        val DEADZONE_LABELS = listOf(
+            "Tightest", "Tighter", "Tight", "Default", "Roomy",
+            "Wider", "Wide", "Looser", "Loose", "Very loose", "Widest"
+        )
     }
 }

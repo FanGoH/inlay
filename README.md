@@ -4,6 +4,8 @@
 
 **A gamepad keyboard for Android handhelds.** You drive it with the controller, not your thumbs on the glass.
 
+This repository is the [FanGoH](https://github.com/FanGoH/inlay) fork of [dakingeman/inlay](https://github.com/dakingeman/inlay). It adds an **opt-in Dual-stick Absolute Selection** mode and keeps Classic navigation as the default.
+
 Move with the D-pad or stick, press A to type, and never reach for the touchscreen again. Made for handhelds like the AYN Odin and Retroid Pocket, and for any Android device with a gamepad connected.
 
 Free, open source, no ads, no tracking, no internet permission.
@@ -44,6 +46,7 @@ All of these are real screenshots from my Odin 2 Portal.
 ## Features
 
 - **Made for controllers.** D-pad or left stick moves the highlight, with smart repeat when you hold a direction.
+- **Optional Dual-stick Absolute Selection.** Hold or toggle a button (RS by default) and each stick aims at one half of the keyboard, the way SteamOS typing does. Stick motion never types; LB / RB confirm. Off by default, so Classic Inlay is unchanged. Details and Thor / Odin notes: [`docs/dual-stick.md`](docs/dual-stick.md).
 - **Every button does something useful.**
   - A types, X deletes (hold it and it speeds up, then deletes whole words), Y is space, Start is enter.
   - LB / RB move the cursor. Hold RT with them to jump whole words.
@@ -65,7 +68,7 @@ All of these are real screenshots from my Odin 2 Portal.
 
 | Device | Android | Result |
 |---|---|---|
-| AYN Odin 2 Portal | 13 | Everything tested |
+| AYN Odin 2 Portal | 13 | Classic Inlay tested upstream. Dual-stick is implemented for this device and the AYN Thor Max; please report how the analog mapping feels. |
 
 Tried it on something else? Please [tell me how it went](../../issues/new/choose), even if it worked perfectly. That's how this list grows.
 
