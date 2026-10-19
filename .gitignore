@@ -20,3 +20,7 @@ __pycache__/
 
 # Sound and video-music working files (62 MB): kept out of build/, which Clean Project empties, and off GitHub
 /sound-work/
+
+/dist/
+/tools/aapt2
+/tools/aapt2-x86_64

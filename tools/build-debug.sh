@@ -12,6 +12,8 @@ if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" ]]; then
   echo "Set ANDROID_HOME or ANDROID_SDK_ROOT." >&2
   exit 1
 fi
+# AGP 9 pulls an x86_64 aapt2 from Maven. On aarch64 hosts, point at a native binary:
+#   android.aapt2FromMavenOverride=$ANDROID_HOME/build-tools/37.0.0/aapt2
 ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
 apk="$root/app/build/outputs/apk/debug/app-debug.apk"
 echo "Debug APK: $apk"
