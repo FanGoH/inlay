@@ -405,7 +405,11 @@ class SettingsActivity : Activity() {
                 0, 10, settings.dualStickDeadzone, { DEADZONE_LABELS[it] }) {
                 update(settings.copy(dualStickDeadzone = it))
             },
-            ChoiceRow(this, "Stick response", "Soft stays precise near the centre. Sharp reaches the edges sooner",
+            SliderRow(this, "Center reach", "How easily the stick hits the middle letters (T G Y H). Raise this if they feel too far inward",
+                0, 10, settings.dualStickCenterReach, { REACH_LABELS[it] }) {
+                update(settings.copy(dualStickCenterReach = it))
+            },
+            ChoiceRow(this, "Stick response", "Soft stays precise near the stick rest. Sharp reaches T/G/Y/H with less throw",
                 DualStickCurve.values().map { it.label }, settings.dualStickCurve.ordinal) {
                 update(settings.copy(dualStickCurve = DualStickCurve.values()[it]))
             },
@@ -593,6 +597,10 @@ class SettingsActivity : Activity() {
         val DEADZONE_LABELS = listOf(
             "Tightest", "Tighter", "Tight", "Default", "Roomy",
             "Wider", "Wide", "Looser", "Loose", "Very loose", "Widest"
+        )
+        val REACH_LABELS = listOf(
+            "Exact", "Near", "Short", "Mild", "Easy",
+            "Easier", "Default", "Long", "Far", "Very far", "Max"
         )
     }
 }

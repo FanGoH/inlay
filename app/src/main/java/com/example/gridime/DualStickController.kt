@@ -34,7 +34,8 @@ class DualStickController {
         region: KeyboardRegion,
         deadzone: Float,
         curve: DualStickCurve,
-        keepLast: Boolean
+        keepLast: Boolean,
+        innerReach: Float = 0.24f
     ): Boolean {
         val prepared = AnalogStickMath.prepare(rawX, rawY, deadzone, curve)
         val current = selection(side)
@@ -47,7 +48,8 @@ class DualStickController {
         } else {
             val nx = AnalogStickMath.normalize(prepared.first)
             val ny = AnalogStickMath.normalize(prepared.second)
-            val (x, y) = AnalogStickMath.mapToRegion(nx, ny, region)
+            val aim = AbsoluteKeyMapper.mappingRegion(region, side, innerReach)
+            val (x, y) = AnalogStickMath.mapToRegion(nx, ny, aim)
             val key = AbsoluteKeyMapper.nearest(x, y, keys, region, side)
             AnalogSelection(selectedKeyId = key?.id, active = key != null, x = x, y = y)
         }

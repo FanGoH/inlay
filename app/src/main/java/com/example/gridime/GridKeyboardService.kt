@@ -640,15 +640,16 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
             event.getAxisValue(MotionEvent.AXIS_RX),
             event.getAxisValue(MotionEvent.AXIS_RY)
         )
+        val reach = AnalogStickMath.innerReachFromSlider(settings.dualStickCenterReach)
         val leftChanged = dualSticks.update(
             DualStickSide.LEFT,
             event.getAxisValue(MotionEvent.AXIS_X),
             event.getAxisValue(MotionEvent.AXIS_Y),
-            keys, leftRegion, deadzone, settings.dualStickCurve, settings.dualStickKeepLast
+            keys, leftRegion, deadzone, settings.dualStickCurve, settings.dualStickKeepLast, reach
         )
         val rightChanged = dualSticks.update(
             DualStickSide.RIGHT, rx, ry,
-            keys, rightRegion, deadzone, settings.dualStickCurve, settings.dualStickKeepLast
+            keys, rightRegion, deadzone, settings.dualStickCurve, settings.dualStickKeepLast, reach
         )
         if (leftChanged || rightChanged) {
             if ((leftChanged && dualSticks.left.active) || (rightChanged && dualSticks.right.active)) {

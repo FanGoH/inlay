@@ -124,6 +124,7 @@ data class KeyboardSettings(
     val dualStickMode: DualStickActivationMode = DualStickActivationMode.DISABLED,
     val dualStickButton: ControllerButton = ControllerButton.R3,
     val dualStickDeadzone: Int = 3,     // 0 tight to 10 wide
+    val dualStickCenterReach: Int = 6,  // 0 exact split to 10 easy T/G/Y/H
     val dualStickCurve: DualStickCurve = DualStickCurve.LINEAR,
     val dualStickKeepLast: Boolean = false,
     // Sound & haptics
@@ -175,6 +176,7 @@ data class KeyboardSettings(
             .putString(K_DUAL_MODE, dualStickMode.name)
             .putString(K_DUAL_BUTTON, dualStickButton.name)
             .putInt(K_DUAL_DEADZONE, dualStickDeadzone)
+            .putInt(K_DUAL_REACH, dualStickCenterReach)
             .putString(K_DUAL_CURVE, dualStickCurve.name)
             .putBoolean(K_DUAL_KEEP, dualStickKeepLast)
             .apply()
@@ -213,6 +215,7 @@ data class KeyboardSettings(
         private const val K_DUAL_MODE = "dual_stick_mode"
         private const val K_DUAL_BUTTON = "dual_stick_button"
         private const val K_DUAL_DEADZONE = "dual_stick_deadzone"
+        private const val K_DUAL_REACH = "dual_stick_center_reach"
         private const val K_DUAL_CURVE = "dual_stick_curve"
         private const val K_DUAL_KEEP = "dual_stick_keep_last"
 
@@ -249,6 +252,7 @@ data class KeyboardSettings(
                 dualStickMode = enumOr(p.getString(K_DUAL_MODE, null), d.dualStickMode),
                 dualStickButton = sanitiseDualStickButton(enumOr(p.getString(K_DUAL_BUTTON, null), d.dualStickButton)),
                 dualStickDeadzone = p.getInt(K_DUAL_DEADZONE, d.dualStickDeadzone),
+                dualStickCenterReach = p.getInt(K_DUAL_REACH, d.dualStickCenterReach),
                 dualStickCurve = enumOr(p.getString(K_DUAL_CURVE, null), d.dualStickCurve),
                 dualStickKeepLast = p.getBoolean(K_DUAL_KEEP, d.dualStickKeepLast)
             )

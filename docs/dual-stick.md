@@ -84,7 +84,8 @@ Same APK and settings. Upstream Inlay was tuned on an Odin 2 Portal, so Classic 
 | Activation | Disabled | Hold or Toggle to use the mode |
 | Activation button | RS | Also LS, Select, LT, RT |
 | Stick deadzone | Default (3) | 0 is tight, 10 is wide |
-| Stick response | Linear | Soft = more precise near centre; Sharp = faster to the edges |
+| Center reach | Default (6) | Raise this if T/G/Y/H feel too far inward |
+| Stick response | Linear | Soft = more precise near rest; Sharp = faster to the middle letters |
 | Remember last key | Off | Off: centre = no selection. On: the last key stays confirmable |
 
 ## Known limits
