@@ -14,6 +14,18 @@ object AbsoluteKeyMapper {
         return left to right
     }
 
+    /**
+     * Stretch the aim rectangle toward the keyboard centre so T/G/Y/H
+     * do not need a pegged inward throw. Ownership of keys is unchanged.
+     */
+    fun mappingRegion(own: KeyboardRegion, side: DualStickSide, innerReach: Float): KeyboardRegion {
+        val extra = own.width * innerReach.coerceIn(0f, 0.5f)
+        return when (side) {
+            DualStickSide.LEFT -> KeyboardRegion(own.left, own.top, own.right + extra, own.bottom)
+            DualStickSide.RIGHT -> KeyboardRegion(own.left - extra, own.top, own.right, own.bottom)
+        }
+    }
+
     fun boundsOf(keys: List<MappedKey>): KeyboardRegion? {
         if (keys.isEmpty()) return null
         var left = Float.POSITIVE_INFINITY

@@ -77,6 +77,13 @@ class AnalogStickMathTest {
     }
 
     @Test
+    fun innerReachSliderScalesInwardTravel() {
+        assertEquals(0f, AnalogStickMath.innerReachFromSlider(0), 0.0001f)
+        assertEquals(0.24f, AnalogStickMath.innerReachFromSlider(6), 0.0001f)
+        assertTrue(AnalogStickMath.innerReachFromSlider(10) <= 0.5f)
+    }
+
+    @Test
     fun prepareReturnsAxesAfterDeadzone() {
         val prepared = AnalogStickMath.prepare(1f, 0f, 0.15f, DualStickCurve.LINEAR)
         assertNotNull(prepared)

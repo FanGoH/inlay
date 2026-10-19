@@ -23,6 +23,19 @@ class AbsoluteKeyMapperTest {
     }
 
     @Test
+    fun mappingRegionReachesInwardWithoutSharingKeys() {
+        val bounds = KeyboardRegion(0f, 0f, 100f, 40f)
+        val (left, right) = AbsoluteKeyMapper.splitRegions(bounds)
+        val leftAim = AbsoluteKeyMapper.mappingRegion(left, DualStickSide.LEFT, 0.24f)
+        val rightAim = AbsoluteKeyMapper.mappingRegion(right, DualStickSide.RIGHT, 0.24f)
+        assertTrue(leftAim.right > left.right)
+        assertTrue(rightAim.left < right.left)
+        val keys = listOf(key("t", 40f, 0f, 50f, 10f), key("y", 50f, 0f, 60f, 10f))
+        assertTrue(AbsoluteKeyMapper.eligibleKeys(keys, left, DualStickSide.LEFT).all { it.id == "t" })
+        assertTrue(AbsoluteKeyMapper.eligibleKeys(keys, right, DualStickSide.RIGHT).all { it.id == "y" })
+    }
+
+    @Test
     fun splitMeetsAtTheCentreWithNoOverlap() {
         val bounds = KeyboardRegion(0f, 0f, 100f, 40f)
         val (left, right) = AbsoluteKeyMapper.splitRegions(bounds)

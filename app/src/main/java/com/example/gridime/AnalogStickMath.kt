@@ -77,5 +77,8 @@ object AnalogStickMath {
     /** Slider 0…10 → radial deadzone. Default 3 ≈ 0.16. */
     fun deadzoneFromSlider(level: Int): Float = 0.05f + level.coerceIn(0, 10) * 0.035f
 
+    /** Slider 0…10 → extra inward aim travel. Default 6 ≈ 24 %. */
+    fun innerReachFromSlider(level: Int): Float = level.coerceIn(0, 10) * 0.04f
+
     fun almostEqual(a: Float, b: Float, epsilon: Float = 0.0001f): Boolean = abs(a - b) < epsilon
 }
