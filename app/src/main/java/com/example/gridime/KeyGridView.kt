@@ -445,12 +445,18 @@ class KeyGridView(context: Context) : View(context) {
         val rows = allRows()
         return rows.flatMapIndexed { r, row ->
             if (r == 0) emptyList()
-            else row.mapIndexed { c, _ ->
-                val rect = keyRect(r, row, c)
-                MappedKey(keyId(r, c), rect.left, rect.top, rect.right, rect.bottom)
+            else row.mapIndexedNotNull { c, key ->
+                if (!isAnalogTarget(key)) null
+                else {
+                    val rect = keyRect(r, row, c)
+                    MappedKey(keyId(r, c), rect.left, rect.top, rect.right, rect.bottom)
+                }
             }
         }
     }
+
+    /** Letters and punctuation only. Space, Shift, layer, Delete and Enter already have buttons. */
+    private fun isAnalogTarget(key: Key) = key.type == KeyType.CHAR
 
     fun keyboardBounds(): KeyboardRegion {
         return AbsoluteKeyMapper.boundsOf(snapshotKeys())
