@@ -48,7 +48,7 @@ class DualStickController {
             val nx = AnalogStickMath.normalize(prepared.first)
             val ny = AnalogStickMath.normalize(prepared.second)
             val (x, y) = AnalogStickMath.mapToRegion(nx, ny, region)
-            val key = AbsoluteKeyMapper.nearest(x, y, keys, region)
+            val key = AbsoluteKeyMapper.nearest(x, y, keys, region, side)
             AnalogSelection(selectedKeyId = key?.id, active = key != null, x = x, y = y)
         }
         val changed = next.selectedKeyId != current.selectedKeyId || next.active != current.active

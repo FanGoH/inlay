@@ -2,18 +2,15 @@ package com.example.gridime
 
 /**
  * Maps a stick position onto the live keyboard geometry.
- * Left and right sticks each own one horizontal region; keys that straddle
- * the split (Space, a wide Enter) can be reached from both sides.
+ * The two halves meet at the centre with no overlap. A key belongs to the
+ * side that contains its centre, so a wide Space is not shared.
  */
 object AbsoluteKeyMapper {
 
-    const val DEFAULT_OVERLAP = 0.08f
-
-    fun splitRegions(bounds: KeyboardRegion, overlapFraction: Float = DEFAULT_OVERLAP): Pair<KeyboardRegion, KeyboardRegion> {
-        val overlap = bounds.width * overlapFraction.coerceIn(0f, 0.45f)
+    fun splitRegions(bounds: KeyboardRegion): Pair<KeyboardRegion, KeyboardRegion> {
         val split = bounds.centerX
-        val left = KeyboardRegion(bounds.left, bounds.top, (split + overlap).coerceAtMost(bounds.right), bounds.bottom)
-        val right = KeyboardRegion((split - overlap).coerceAtLeast(bounds.left), bounds.top, bounds.right, bounds.bottom)
+        val left = KeyboardRegion(bounds.left, bounds.top, split, bounds.bottom)
+        val right = KeyboardRegion(split, bounds.top, bounds.right, bounds.bottom)
         return left to right
     }
 
@@ -32,16 +29,28 @@ object AbsoluteKeyMapper {
         return KeyboardRegion(left, top, right, bottom)
     }
 
-    fun eligibleKeys(keys: List<MappedKey>, region: KeyboardRegion): List<MappedKey> =
-        keys.filter { region.intersects(it) }
+    /** A key is owned by the half that contains its centre, not by rectangle overlap. */
+    fun eligibleKeys(keys: List<MappedKey>, region: KeyboardRegion, side: DualStickSide): List<MappedKey> =
+        keys.filter { key ->
+            val cx = key.centerX
+            when (side) {
+                DualStickSide.LEFT -> cx >= region.left && cx < region.right
+                DualStickSide.RIGHT -> cx >= region.left && cx <= region.right
+            }
+        }
 
     /**
      * Nearest eligible key to [x],[y]. Prefers a key that contains the point;
-     * otherwise the key whose rectangle is closest (handles staggered rows
-     * and wide keys such as Space).
+     * otherwise the key whose rectangle is closest (handles staggered rows).
      */
-    fun nearest(x: Float, y: Float, keys: List<MappedKey>, region: KeyboardRegion): MappedKey? {
-        val candidates = eligibleKeys(keys, region)
+    fun nearest(
+        x: Float,
+        y: Float,
+        keys: List<MappedKey>,
+        region: KeyboardRegion,
+        side: DualStickSide
+    ): MappedKey? {
+        val candidates = eligibleKeys(keys, region, side)
         if (candidates.isEmpty()) return null
         val inside = candidates.filter { it.contains(x, y) }
         if (inside.size == 1) return inside[0]
@@ -55,10 +64,11 @@ object AbsoluteKeyMapper {
         normalizedX: Float,
         normalizedY: Float,
         keys: List<MappedKey>,
-        region: KeyboardRegion
+        region: KeyboardRegion,
+        side: DualStickSide
     ): MappedKey? {
         val (x, y) = AnalogStickMath.mapToRegion(normalizedX, normalizedY, region)
-        return nearest(x, y, keys, region)
+        return nearest(x, y, keys, region, side)
     }
 
     private fun hypotCentre(key: MappedKey, x: Float, y: Float): Float {
