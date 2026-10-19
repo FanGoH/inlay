@@ -52,6 +52,8 @@ The handoff suggested LT / RT as confirm buttons. Those already mean symbols and
 
 Install the debug APK over the same application id as upstream Inlay (`io.github.dakingeman.inlay`).
 
+A debug APK from this branch is produced by `tools/build-debug.sh` at `app/build/outputs/apk/debug/app-debug.apk` (about 13 MB). On an ARM64 Linux host, AGP 9 needs a native `aapt2`; this Pi build used the 37.0.0 binary from [Commit451/android-arm-build-tools](https://github.com/Commit451/android-arm-build-tools) via `android.aapt2FromMavenOverride`.
+
 1. **Classic regression.** Activation = Disabled. D-pad, left stick, A / X / Y / LT / RT / LB / RB / Select / Start behave as 1.0.0.
 2. **Hold.** Activation = Hold, button = RS. Hold RS: two highlights, no typing from the sticks. Release RS: Classic returns, no extra character.
 3. **Toggle.** One RS press in, one press out. Hold RS: the mode must not flicker.

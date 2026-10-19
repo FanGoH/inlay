@@ -11,3 +11,6 @@
 *.jks
 *.keystore
 /app/release
+/dist/
+/tools/aapt2
+/tools/aapt2-x86_64
