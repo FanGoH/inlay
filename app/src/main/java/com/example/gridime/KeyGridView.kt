@@ -444,7 +444,8 @@ class KeyGridView(context: Context) : View(context) {
     fun snapshotKeys(): List<MappedKey> {
         val rows = allRows()
         return rows.flatMapIndexed { r, row ->
-            row.mapIndexed { c, _ ->
+            if (r == 0) emptyList()
+            else row.mapIndexed { c, _ ->
                 val rect = keyRect(r, row, c)
                 MappedKey(keyId(r, c), rect.left, rect.top, rect.right, rect.bottom)
             }
