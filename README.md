@@ -20,6 +20,8 @@
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/dakingeman/inlay"><img src="https://img.shields.io/badge/Get%20it%20with%20Obtainium-2A2C35?style=flat-square" alt="Get it with Obtainium" height="34"></a>
 </p>
 
+<p align="center"><em>FanGoH fork:</em> opt-in <a href="docs/dual-stick.md">Dual-stick Absolute Selection</a> on top of upstream Inlay. Classic navigation stays the default.</p>
+
 <p align="center">
   <a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#controls">Controls</a> · <a href="#questions">Questions</a> · <a href="#tested-on">Tested on</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="../../issues/new/choose">Report a problem</a>
 </p>
@@ -209,6 +211,9 @@ I'm Emre, and I don't write code. I want to say that plainly: every line of this
 I'm sharing it to give something back to the community. There's no catch and nothing is for sale.
 
 Since I can't read the code myself, I can't promise it's flawless, and I can only test it on my own device. If something goes wrong on yours, please open an issue and tell me what happened. If you can read code, improvements are very welcome.
+
+This FanGoH fork adds **optional Dual-stick Absolute Selection** (Settings → Controls). Hold or toggle a button (RS by default) and each stick aims at one half of the keyboard. Stick motion never types; LB / RB confirm. Off by default. Details: [`docs/dual-stick.md`](docs/dual-stick.md).
+
 
 ## Build it yourself
 

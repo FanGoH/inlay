@@ -1628,6 +1628,22 @@ class SettingsActivity : Activity() {
             Section("Fixing a typo", typo),
             Section("Copy and paste", copy),
             Section("Keyboard", if (controls.sticks) listOf(GuideRow(this, "Keyboard size · Normal, Large, Largest", "{L3}")) else emptyList())
+        ) + dualGuideSections()
+    }
+
+    /** Button-guide rows for Dual-stick, only when the mode is enabled. */
+    private fun dualGuideSections(): List<Section> {
+        if (settings.dualStickMode == DualStickActivationMode.DISABLED) return emptyList()
+        val arm = settings.dualStickButton.name.let { "{$it}" }
+        val how = if (settings.dualStickMode == DualStickActivationMode.HOLD) "Hold $arm" else "Press $arm"
+        return listOf(
+            Section("Dual-stick selection", listOf(
+                GuideRow(this, if (settings.dualStickMode == DualStickActivationMode.HOLD) "Hold to aim both sticks" else "Turn Dual-stick on or off", how),
+                GuideRow(this, "Type the left-stick key", "{L1}"),
+                GuideRow(this, "Type the right-stick key", "{R1}"),
+                GuideRow(this, "Type the last key you aimed at", "{A}"),
+                GuideRow(this, "Move the text cursor", "D-pad · {R2} + {L1} {R1}")
+            ))
         )
     }
 
@@ -1686,6 +1702,30 @@ class SettingsActivity : Activity() {
             ChoiceRow(this, "TV mode", "A compact floating keyboard with large text. Automatic on Android TV or when docked",
                 TvMode.values().map { it.label }, settings.tvMode.ordinal) {
                 update(settings.copy(tvMode = TvMode.values()[it]))
+            }
+            )),
+
+            Section("Dual-stick selection", if (c.remote || !c.sticks) emptyList() else listOf(
+            ChoiceRow(this, "Activation", "Off keeps Classic navigation. Hold is on only while the button is down. Toggle is one press in, one press out",
+                DualStickActivationMode.values().map { it.label }, settings.dualStickMode.ordinal) {
+                update(settings.copy(dualStickMode = DualStickActivationMode.values()[it]))
+            },
+            ChoiceRow(this, "Activation button", "Default is {R3}, which Classic Inlay does not use. The button never types a character",
+                DUAL_STICK_ACTIVATION_BUTTONS.map { it.activationLabel() },
+                DUAL_STICK_ACTIVATION_BUTTONS.indexOf(settings.dualStickButton).coerceAtLeast(0)) {
+                update(settings.copy(dualStickButton = DUAL_STICK_ACTIVATION_BUTTONS[it]))
+            },
+            SliderRow(this, "Stick deadzone", "How far you have to push before a key is selected",
+                0, 10, settings.dualStickDeadzone, { DEADZONE_LABELS[it] }) {
+                update(settings.copy(dualStickDeadzone = it))
+            },
+            ChoiceRow(this, "Stick response", "Soft stays precise near the centre. Sharp reaches the edges sooner",
+                DualStickCurve.values().map { it.label }, settings.dualStickCurve.ordinal) {
+                update(settings.copy(dualStickCurve = DualStickCurve.values()[it]))
+            },
+            ToggleRow(this, "Remember last key", "When off, letting a stick return to centre clears its selection",
+                settings.dualStickKeepLast) {
+                update(settings.copy(dualStickKeepLast = it))
             }
             )),
             // Button badges and combo tips are about a controller's buttons: a remote has none. One choice, since the
@@ -2238,6 +2278,7 @@ class SettingsActivity : Activity() {
         )),
         Section("Inlay", listOfNotNull(
             InfoRow(this, "Version", appVersion()),
+            InfoRow(this, "This build", "FanGoH fork · optional Dual-stick Absolute Selection"),
             InfoRow(this, "Licence and credits", "Free and open source. Fonts: Atkinson Hyperlegible Next, Inter, M PLUS Rounded 1c and Press Start 2P (Open Font Licence). PlayStation drawing traced from \"Dualshock 4 Layout.svg\" by Tokyoship (CC BY 3.0). Full screen height after an idea from Odin KB. Controller names belong to their makers"),
             SOURCE_URL.takeIf { it.isNotEmpty() }?.let { url ->
                 ActionRow(this, "Source code", "See how it's made, report a problem or suggest an idea") {
@@ -2307,8 +2348,12 @@ class SettingsActivity : Activity() {
         const val FIND_SETTLE_MS = 60L
         const val FIND_GLIDE_MS = 420L      // the page's glide to a found row: calm enough to follow with the eye     // after the page and the keyboard have moved, before Find's row is brought into view       // a trigger sent as a button and an axis counts once (the keyboard uses the same)
         /** The project's web page (e.g. on GitHub). Leave empty to hide the "Source code" row. */
-        const val SOURCE_URL = "https://github.com/dakingeman/inlay"
+        const val SOURCE_URL = "https://github.com/FanGoH/inlay"
         val STICK_LABELS = listOf("Slowest", "Slow", "Medium", "Fast", "Fastest")
+        val DEADZONE_LABELS = listOf(
+            "Tightest", "Tighter", "Tight", "Default", "Roomy",
+            "Wider", "Wide", "Looser", "Loose", "Very loose", "Widest"
+        )
     }
 }
 

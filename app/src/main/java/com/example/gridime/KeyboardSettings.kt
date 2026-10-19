@@ -349,6 +349,12 @@ data class KeyboardSettings(
     val secretRowNew: Boolean = false,    // ...and the Theme row (where they are) hasn't been visited yet
     val buttonsRowNew: Boolean = false,   // updated from before 1.3: the Your buttons row carries the spark until visited
     val hasSticks: Boolean = true,        // worked out from the device, never saved (see Controls)
+    // Dual-stick Absolute Selection (opt-in; Disabled keeps Classic navigation)
+    val dualStickMode: DualStickActivationMode = DualStickActivationMode.DISABLED,
+    val dualStickButton: ControllerButton = ControllerButton.R3,
+    val dualStickDeadzone: Int = 3,     // 0 tight to 10 wide
+    val dualStickCurve: DualStickCurve = DualStickCurve.LINEAR,
+    val dualStickKeepLast: Boolean = false,
     // Sound & haptics
     val vibration: Boolean = true,
     val moveStrength: Int = 0,          // 0 to 10. Off for moving to start with ("9+ vibrations to type one letter", fuckR196); presses still buzz
@@ -484,6 +490,11 @@ data class KeyboardSettings(
             .put(K_SILENT, soundInSilent)
             .put(K_SILENT_2, soundInSilent)
             .put(K_CLIP_HISTORY, saveClipHistory)
+            .put(K_DUAL_MODE, dualStickMode.name)
+            .put(K_DUAL_BUTTON, dualStickButton.name)
+            .put(K_DUAL_DEADZONE, dualStickDeadzone)
+            .put(K_DUAL_CURVE, dualStickCurve.name)
+            .put(K_DUAL_KEEP, dualStickKeepLast)
             .put(K_PREVIEW, showPreview)
         SmallFile.write(context, FILE, json.toString())
     }
@@ -584,6 +595,11 @@ data class KeyboardSettings(
         private const val K_SILENT_2 = "sound_in_silent_2"
         private const val K_CLIP_HISTORY = "save_clip_history"
         private const val K_PREVIEW = "show_preview"
+        private const val K_DUAL_MODE = "dual_stick_mode"
+        private const val K_DUAL_BUTTON = "dual_stick_button"
+        private const val K_DUAL_DEADZONE = "dual_stick_deadzone"
+        private const val K_DUAL_CURVE = "dual_stick_curve"
+        private const val K_DUAL_KEEP = "dual_stick_keep_last"
 
         fun load(context: Context): KeyboardSettings {
             val text = SmallFile.read(context, FILE)
@@ -726,12 +742,20 @@ data class KeyboardSettings(
                 moveSounds = p.bool(K_MOVE_SOUNDS, d.moveSounds),
                 soundInSilent = p.bool(K_SILENT_2, p.bool(K_SILENT, false) || !phone),
                 saveClipHistory = p.bool(K_CLIP_HISTORY, d.saveClipHistory),
-                showPreview = p.bool(K_PREVIEW, d.showPreview)
+                showPreview = p.bool(K_PREVIEW, d.showPreview),
+                dualStickMode = enumOr(p.str(K_DUAL_MODE), d.dualStickMode),
+                dualStickButton = sanitiseDualStickButton(enumOr(p.str(K_DUAL_BUTTON), d.dualStickButton)),
+                dualStickDeadzone = p.int(K_DUAL_DEADZONE, d.dualStickDeadzone),
+                dualStickCurve = enumOr(p.str(K_DUAL_CURVE), d.dualStickCurve),
+                dualStickKeepLast = p.bool(K_DUAL_KEEP, d.dualStickKeepLast)
             )
         }
 
         private inline fun <reified T : Enum<T>> enumOr(name: String?, fallback: T): T =
             name?.let { n -> enumValues<T>().firstOrNull { it.name == n } } ?: fallback
+
+        private fun sanitiseDualStickButton(button: ControllerButton): ControllerButton =
+            if (button in DUAL_STICK_ACTIVATION_BUTTONS) button else ControllerButton.R3
     }
 }
 

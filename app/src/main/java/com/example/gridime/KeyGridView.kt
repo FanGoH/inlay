@@ -287,6 +287,11 @@ class KeyGridView(context: Context) : View(context) {
     private var selectedCount = 0
     private var clipPreview: String? = null
     private var clips: List<String> = emptyList()
+    private var dualStickActive = false
+    private var leftAnalog = AnalogSelection.Inactive
+    private var rightAnalog = AnalogSelection.Inactive
+    private var dualFade = 0f
+    private var dualAnim: ValueAnimator? = null
 
     /**
      * Column memory: where you were aiming horizontally when you started moving up
@@ -1571,6 +1576,66 @@ class KeyGridView(context: Context) : View(context) {
         invalidate()
     }
 
+    fun setDualStickActive(on: Boolean) {
+        if (dualStickActive == on) return
+        dualStickActive = on
+        if (!on) {
+            leftAnalog = AnalogSelection.Inactive
+            rightAnalog = AnalogSelection.Inactive
+        }
+        fadeDual(on)
+        invalidate()
+    }
+
+    fun setAnalogSelections(left: AnalogSelection, right: AnalogSelection) {
+        leftAnalog = left
+        rightAnalog = right
+        invalidate()
+    }
+
+    fun snapshotKeys(): List<MappedKey> {
+        val rows = allRows()
+        return rows.flatMapIndexed { r, row ->
+            row.mapIndexed { c, _ ->
+                val rect = keyRect(r, row, c)
+                MappedKey(keyId(r, c), rect.left, rect.top, rect.right, rect.bottom)
+            }
+        }
+    }
+
+    fun keyboardBounds(): KeyboardRegion {
+        return AbsoluteKeyMapper.boundsOf(snapshotKeys())
+            ?: KeyboardRegion(contentLeft(), edge, contentLeft() + contentWidth(), height.toFloat() - edge)
+    }
+
+    fun pressKeyById(id: String): Boolean {
+        val rows = allRows()
+        rows.forEachIndexed { r, row ->
+            row.forEachIndexed { c, key ->
+                if (keyId(r, c) == id) {
+                    press(key)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun keyId(row: Int, col: Int) = "$row:$col"
+
+    private fun fadeDual(show: Boolean) {
+        dualAnim?.cancel()
+        dualAnim = ValueAnimator.ofFloat(dualFade, if (show) 1f else 0f).apply {
+            duration = Design.MOTION_FADE
+            interpolator = easeOut
+            addUpdateListener {
+                dualFade = it.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
     fun setClipPreview(text: String?) {
         clipPreview = text
             ?.replace('\n', ' ')
@@ -1860,7 +1925,7 @@ class KeyGridView(context: Context) : View(context) {
         }
         val a = accents
         // The tool strip steps aside for the RT chips and for the accents, and fades in after a change
-        val stripAlpha = (1f - max(comboFade, stripOut(a))).coerceIn(0f, 1f) * stripFade
+        val stripAlpha = (1f - max(comboFade, dualFade, stripOut(a))).coerceIn(0f, 1f) * stripFade
 
         // 0. The number row's bar
         drawNumberBar(canvas, rows)
@@ -1915,7 +1980,12 @@ class KeyGridView(context: Context) : View(context) {
             fillPaint.color = Contrast.withAlpha(focusFill, ((focusFill ushr 24) * ghostAlpha).roundToInt())
             canvas.drawRoundRect(ghostRect, corner, corner, fillPaint)
         }
-        if (!highlightHidden && !onNote) drawHighlight(canvas)
+        if (dualStickActive) {
+            drawAnalogHighlight(canvas, leftAnalog, colAccent, colGlow)
+            drawAnalogHighlight(canvas, rightAnalog, rightAccent, rightGlow)
+        } else if (!highlightHidden && !onNote) {
+            drawHighlight(canvas)
+        }
 
         // 3. Labels, icons, badges
         iconPaint.strokeWidth = u(Design.STROKE_ICON)
@@ -1924,15 +1994,15 @@ class KeyGridView(context: Context) : View(context) {
             if (alpha <= 0f) return@forEachIndexed
             val layerSaved = if (alpha < 1f) canvas.saveLayerAlpha(stripRect(), (alpha * 255).roundToInt()) else -1
             row.forEachIndexed { c, key ->
-                val focused = r == selRow && c == selCol && !highlightHidden
+                val focused = isKeyFocused(r, c) && !highlightHidden
                 val rect = keyRect(r, row, c)
                 if (focused && style == HighlightStyle.LIFT) {
                     // Lift: the content moves out with the lifted key by exactly the same step, so badges stay
                     // inside it on every key width (scaling made the space bar's badge overshoot, 28 Oct 2026)
                     val g = liftGrow(rect)
-                    drawKeyContent(canvas, key, RectF(rect).apply { inset(-g, -g) }, focused = true)
+                    drawKeyContent(canvas, key, RectF(rect).apply { inset(-g, -g) }, focused = true, row = r, col = c)
                 } else {
-                    drawKeyContent(canvas, key, rect, focused)
+                    drawKeyContent(canvas, key, rect, focused, r, c)
                 }
             }
             if (layerSaved >= 0) canvas.restoreToCount(layerSaved)
@@ -1941,10 +2011,18 @@ class KeyGridView(context: Context) : View(context) {
         // 3b. NEW: the accents, over a dimmed keyboard
         drawAccentLayer(canvas, rows)
 
-        // 4. RT combo chips, faded in over the tool strip (never over the accents: those come first)
-        if (comboFade > 0f && accents == null) {
-            val saved = canvas.saveLayerAlpha(stripRect(), (comboFade * 255).roundToInt())
-            drawChipsIn(canvas, stripParts(), comboChips())
+        // 3c. Dual-stick aim dots (stick position, not a key)
+        if (dualStickActive) {
+            drawAim(canvas, leftAnalog, colAccent)
+            drawAim(canvas, rightAnalog, rightAccent)
+        }
+
+        // 4. RT combo chips, or dual-stick confirm chips, over the tool strip (never over the accents)
+        val chipAlpha = max(comboFade, if (comboFade <= 0f) dualFade else 0f)
+        if (chipAlpha > 0f && accents == null) {
+            val chips = if (comboFade > 0f) comboChips() else dualChips()
+            val saved = canvas.saveLayerAlpha(stripRect(), (chipAlpha * 255).roundToInt())
+            drawChipsIn(canvas, stripParts(), chips)
             canvas.restoreToCount(saved)
         }
 
@@ -2261,14 +2339,25 @@ class KeyGridView(context: Context) : View(context) {
     private fun liftGrow(r: RectF) = min(r.height() * (LIFT_SCALE - 1f) / 2f, gap / 4f)
 
     private fun drawHighlight(canvas: Canvas, radius: Float = corner) {
+        drawHighlight(canvas, focusRect, colAccent, colGlow, focusFill, radius)
+    }
+
+    private fun drawHighlight(
+        canvas: Canvas,
+        rect: RectF,
+        accent: Int,
+        glow: Int,
+        fill: Int,
+        radius: Float = corner
+    ) {
         val lifting = style == HighlightStyle.LIFT
-        val cx = focusRect.centerX()
-        val cy = focusRect.centerY()
+        val cx = rect.centerX()
+        val cy = rect.centerY()
         // Lift grows the key, but by the same small step on every side and never more than a
         // quarter of the gap, so wide keys (space, enter) don't reach their neighbours
-        val grow = if (lifting) liftGrow(focusRect) else 0f
-        val hw = focusRect.width() / 2f * pressScale + grow
-        val hh = focusRect.height() / 2f * pressScale + grow
+        val grow = if (lifting) liftGrow(rect) else 0f
+        val hw = rect.width() / 2f * pressScale + grow
+        val hh = rect.height() / 2f * pressScale + grow
         val pill = RectF(cx - hw, cy - hh, cx + hw, cy + hh)
         logRect(canvas, "pill", pill)
         val r = min(radius + grow, pill.height() / 2f)
@@ -2280,21 +2369,21 @@ class KeyGridView(context: Context) : View(context) {
             // Glow: a soft accent ring on the key's edge, a hairline of the key showing, then the fill.
             // TV mode always adds it, thicker, so the highlight reads from across the room.
             val ringW = u(if (tv) Design.RING_GLOW_TV else Design.RING_GLOW)
-            ringPaint.color = if (tv) Contrast.withAlpha(colAccent, Design.ALPHA_GLOW_TV) else colGlow
+            ringPaint.color = if (tv) Contrast.withAlpha(accent, Design.ALPHA_GLOW_TV) else glow
             ringPaint.strokeWidth = ringW
             val half = ringW / 2f
             canvas.drawRoundRect(RectF(pill).apply { inset(half, half) }, max(0f, r - half), max(0f, r - half), ringPaint)
         }
         val fillInset = if (halo) u(if (tv) Design.RING_GLOW_TV else Design.RING_GLOW) + u(Design.RING_GAP) else 0f
         val fillR = max(0f, r - fillInset)
-        fillPaint.color = focusFill
+        fillPaint.color = fill
         canvas.drawRoundRect(RectF(pill).apply { inset(fillInset, fillInset) }, fillR, fillR, fillPaint)
 
         when (style) {
             HighlightStyle.OUTLINE -> {
                 // A crisp accent ring on the key's own edge (the lifted key fills the inside), heavy enough to read from a distance
                 val ringW = u(Design.RING_OUTLINE)
-                ringPaint.color = colAccent
+                ringPaint.color = accent
                 ringPaint.strokeWidth = ringW
                 val half = ringW / 2f
                 canvas.drawRoundRect(RectF(pill).apply { inset(half, half) }, max(0f, r - half), max(0f, r - half), ringPaint)
@@ -2305,7 +2394,7 @@ class KeyGridView(context: Context) : View(context) {
                 val barH = u(2.5f)
                 // Low enough to clear descenders (g, p, y) on every key height (audit, 28 Oct 2026)
                 val barY = pill.bottom - u(2.5f)
-                fillPaint.color = colAccent
+                fillPaint.color = accent
                 canvas.drawRoundRect(cx - barW / 2, barY - barH, cx + barW / 2, barY, barH, barH, fillPaint)
             }
             else -> Unit
@@ -2320,8 +2409,47 @@ class KeyGridView(context: Context) : View(context) {
         }
     }
 
-    private fun visibleBg(key: Key, focused: Boolean): Int {
-        if (focused) return focusFill
+    private val rightAccent: Int get() = secondaryAccent(colAccent)
+    private val rightGlow: Int get() = Contrast.withAlpha(rightAccent, 0x59)
+
+    private fun isKeyFocused(row: Int, col: Int): Boolean {
+        if (!dualStickActive) return row == selRow && col == selCol
+        val id = keyId(row, col)
+        return (leftAnalog.active && leftAnalog.selectedKeyId == id) ||
+            (rightAnalog.active && rightAnalog.selectedKeyId == id)
+    }
+
+    private fun analogFocusFill(accent: Int): Int = when (style) {
+        HighlightStyle.GLOW, HighlightStyle.SOLID -> accent
+        HighlightStyle.OUTLINE -> Contrast.over(Contrast.withAlpha(Color.WHITE, Design.ALPHA_FAINT_STRONG), colKey)
+        HighlightStyle.LIFT -> Contrast.over(Contrast.withAlpha(accent, Design.ALPHA_TINT_GLOW), colKey)
+    }
+
+    private fun drawAnalogHighlight(canvas: Canvas, selection: AnalogSelection, accent: Int, glow: Int) {
+        if (!selection.active) return
+        val id = selection.selectedKeyId ?: return
+        val rect = rectForId(id) ?: return
+        drawHighlight(canvas, rect, accent, glow, analogFocusFill(accent))
+    }
+
+    private fun drawAim(canvas: Canvas, selection: AnalogSelection, accent: Int) {
+        if (!selection.active) return
+        fillPaint.color = Contrast.withAlpha(accent, 0xC0)
+        canvas.drawCircle(selection.x, selection.y, u(2.5f), fillPaint)
+    }
+
+    private fun rectForId(id: String): RectF? {
+        val rows = allRows()
+        rows.forEachIndexed { r, row ->
+            row.forEachIndexed { c, _ ->
+                if (keyId(r, c) == id) return keyRect(r, row, c)
+            }
+        }
+        return null
+    }
+
+    private fun visibleBg(key: Key, focused: Boolean, row: Int = selRow, col: Int = selCol): Int {
+        if (focused) return focusFillFor(row, col)
         if (key.type == KeyType.DIGIT) return seen(colKey)          // digits sit on their own slim keys
         // On the see-through theme the tool strip sits on its own plate (drawn in onDraw)
         // A retro top bar's own band sits behind the tool words (Grey brick's raised back bar)
@@ -2331,13 +2459,21 @@ class KeyGridView(context: Context) : View(context) {
     }
 
     /** The accent colour if readable on this background, otherwise plain ink. */
+    private fun focusFillFor(row: Int, col: Int): Int {
+        if (!dualStickActive) return focusFill
+        val id = keyId(row, col)
+        val rightOnly = rightAnalog.active && rightAnalog.selectedKeyId == id &&
+            !(leftAnalog.active && leftAnalog.selectedKeyId == id)
+        return analogFocusFill(if (rightOnly) rightAccent else colAccent)
+    }
+
     private fun accentOn(bg: Int): Int =
         if (Contrast.ratio(colAccent, bg) >= 3.0) colAccent else Contrast.inkFor(bg)
 
     private val undoOnDelete get() = heldShift && settings.undoCombo
 
-    private fun drawKeyContent(canvas: Canvas, key: Key, rect: RectF, focused: Boolean) {
-        val bg = visibleBg(key, focused)
+    private fun drawKeyContent(canvas: Canvas, key: Key, rect: RectF, focused: Boolean, row: Int = selRow, col: Int = selCol) {
+        val bg = visibleBg(key, focused, row, col)
         // A retro key's own label colour (the PlayStation's symbols) when it reads; plain ink otherwise
         val ink = look?.inks?.get(key.type)?.takeIf { !focused && Contrast.ratio(it, bg) >= Design.RETRO_INK_MIN } ?: Contrast.inkFor(bg)
         // Quiet words (tools, the other suggestions): soft, but never under 4.5:1 on what's really behind them
@@ -2468,6 +2604,14 @@ class KeyGridView(context: Context) : View(context) {
             if (accentsMatter) undo else accent
         )
     }
+
+
+    /** Shown over the tool strip while Dual-stick Absolute Selection is on. */
+    private fun dualChips(): List<List<HintPart>> = listOf(
+        listOf(HintPart.Badge(ControllerButton.L1), HintPart.Text("Left")),
+        listOf(HintPart.Badge(ControllerButton.R1), HintPart.Text("Right")),
+        listOf(HintPart.Badge(ControllerButton.A), HintPart.Text("Last"))
+    )
 
     /** Shown on the space bar in select mode, most useful first. */
     private fun selectChips(): List<List<HintPart>> = listOfNotNull(

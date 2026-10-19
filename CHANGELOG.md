@@ -175,6 +175,19 @@ The first big update, shaped by the comments on GitHub and Reddit. Thank you to 
 
 Your settings and clipboard history carry over from 1.0.0. Code written by Claude; directed and tested by me on an AYN Odin 2 Portal.
 
+## FanGoH — Dual-stick Absolute Selection
+
+Optional SteamOS-style aiming with both analog sticks on top of Inlay 1.3.0. Classic D-pad / left-stick navigation is unchanged until you turn this on. Version stays **1.3.0** (versionCode 6).
+
+- **Disabled / Hold / Toggle.** Off by default. Hold is on only while the activation button is down. Toggle is one press in, one press out. Key-repeat never toggles.
+- **Default activation is RS (R3)**, which Classic Inlay does not use. The activation button never types a character.
+- **Absolute mapping** from each stick onto the live key rectangles (staggered Classic rows, layout and size changes).
+- **LB / RB type** the left / right selection. **A** types the last key you aimed at. Stick movement never inserts text.
+- Shift, symbols, delete, space, enter, clipboard and word-jump (`RT` + `LB` / `RB`) stay available.
+- Settings persist. Unit tests cover mapping, deadzones and activation transitions.
+
+See `docs/dual-stick.md` for Thor / Odin testing notes and platform limits.
+
 
 ## 1.0.0 — First release
 

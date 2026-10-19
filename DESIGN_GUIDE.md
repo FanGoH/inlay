@@ -232,8 +232,11 @@ Tonal packs (Chime, Glass, Pop, Retro) use C major pentatonic in pure ratios: on
 | View / Select | select mode · ×2 select all | — |
 | Menu / Start | enter | — |
 | LS (press) | keyboard size: Normal, Large, Largest | — |
+| RS (press) | unused in Classic. Optional Dual-stick activation (off by default) | — |
 
 The first-run tour uses A / Right = next, B / Left = back, Start = skip.
+
+**Dual-stick Absolute Selection** is opt-in (Settings → Controls). While it is active, the left stick aims at the left half of the live keyboard, the right stick aims at the right half, and stick motion never types. LB / RB confirm the matching stick; A confirms the last key you aimed at. D-pad left / right move the text cursor. LT, RT, X, Y and Start keep their Classic jobs. Letting the keyboard hide, or losing focus, always leaves the mode so Hold cannot stick.
 
 ## App icon
 
