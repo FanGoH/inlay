@@ -12,7 +12,7 @@ While the mode is active:
 - Holding a stick still does not walk the highlight. Moving a stick does not type.
 - **LB** types the left selection, **RB** types the right selection, **A** types the last key you aimed at.
 
-The split uses live key rectangles, so staggered Classic rows and size / orientation changes stay correct. The two halves meet at the centre with no overlap; a key belongs to the stick that owns its centre. The top tool strip is not part of analog aiming.
+The split uses live key rectangles, so staggered Classic rows and size / orientation changes stay correct. The two halves meet at the centre with no overlap; a key belongs to the stick that owns its centre. Analog aiming only includes letter and punctuation keys. Space, Shift, symbols/layer, Delete, Enter, and the tool strip stay on their existing buttons.
 
 ## Turn it on
 
@@ -58,7 +58,7 @@ A debug APK from this branch is produced by `tools/build-debug.sh` at `app/build
 2. **Hold.** Activation = Hold, button = RS. Hold RS: two highlights, no typing from the sticks. Release RS: Classic returns, no extra character.
 3. **Toggle.** One RS press in, one press out. Hold RS: the mode must not flicker.
 4. **Dismiss.** Open a field, hold RS, press Home or Back. Re-open the keyboard: Dual-stick must be off.
-5. **Both sticks.** Left stick picks keys on the left, right stick on the right, independently. The tool strip is not a target. Middle keys are not shared.
+5. **Both sticks.** Left stick picks keys on the left, right stick on the right, independently. Space, Shift, layer, Delete, Enter, and the tool strip are not analog targets.
 6. **Confirm.** LB / RB / A type the aimed keys. Rapid left/right alternation should not drop or double characters.
 7. **Editing.** X, Y, Start, LT, RT, clipboard and select mode still work. RT + LB / RB still jumps words.
 8. **Layouts.** Try Grid and Classic, Normal / Large / Largest, letters and symbols, portrait and landscape.
