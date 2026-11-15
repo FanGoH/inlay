@@ -1932,7 +1932,7 @@ class KeyGridView(context: Context) : View(context) {
         }
         val a = accents
         // The tool strip steps aside for the RT chips and for the accents, and fades in after a change
-        val stripAlpha = (1f - max(comboFade, dualFade, stripOut(a))).coerceIn(0f, 1f) * stripFade
+        val stripAlpha = (1f - max(max(comboFade, dualFade), stripOut(a))).coerceIn(0f, 1f) * stripFade
 
         // 0. The number row's bar
         drawNumberBar(canvas, rows)
