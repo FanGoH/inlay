@@ -1,10 +1,12 @@
 package com.example.gridime
 
+import android.view.KeyEvent
+
 /** DIGIT = a key on the optional number row. GAP = an empty word slot in the tool strip (never focused). */
-enum class KeyType { CHAR, SHIFT, LAYER, SPACE, ENTER, DELETE, TOOL, CLIP, EMPTY, DIGIT, GAP }
+enum class KeyType { CHAR, SHIFT, LAYER, SPACE, ENTER, DELETE, TOOL, CLIP, EMPTY, DIGIT, GAP, HOST, MOD }
 enum class ShiftState { OFF, ONCE, LOCK }
 enum class Tool { SELECT, SELECT_ALL, CUT, COPY, PASTE, HISTORY, SETTINGS, WORD, VOICE }
-enum class Layer { LETTERS, SYMBOLS, CLIPS, NUMPAD }
+enum class Layer { LETTERS, SYMBOLS, CLIPS, NUMPAD, DEVELOPER }
 
 /**
  * What kind of text box is being typed into, from the app's own description of it.
@@ -27,7 +29,11 @@ data class Key(
     val tool: Tool? = null,
     val hint: ControllerButton? = null,
     val index: Int = -1,
-    val best: Boolean = false
+    val best: Boolean = false,
+    /** Android keycode for HOST keys (Esc, Tab, F-keys, …). */
+    val hostCode: Int = 0,
+    /** KeyEvent meta mask for sticky MOD keys (Ctrl / Alt). */
+    val meta: Int = 0
 )
 
 /**
@@ -192,16 +198,84 @@ object Layouts {
     fun numberRow(): List<Key> = "1234567890".map { Key(KeyType.DIGIT, it.toString()) }
 
     /** With the number row on, the numbers are already on top, so the symbols page brings extra symbols instead. */
-    fun symbolRows(layout: KeyLayout, language: Language = Language.ENGLISH, numberRow: Boolean = false): List<List<Key>> {
+    fun symbolRows(
+        layout: KeyLayout,
+        language: Language = Language.ENGLISH,
+        numberRow: Boolean = false,
+        developerKeys: Boolean = false
+    ): List<List<Key>> {
         val space = if (layout == KeyLayout.GRID) 4f else 5f
         val side = if (layout == KeyLayout.GRID) 2f else 1.5f
+        // When developer keys are on, the bottom-left layer key becomes Fn (second L2 opens Esc/Tab/…).
+        val next = if (developerKeys) "Fn" else language.lettersKey
         return listOf(
             if (numberRow) chars("~`|\\{}[]<>") else chars("1234567890"),
-            chars("@#\$%&-+()/"),
+            chars("@#$%&-+()/"),
             chars("*\"':;!?=" + language.currency) + delete(1f),
-            bottomRow(language.lettersKey, space, side)
+            bottomRow(next, space, side)
         )
     }
+
+    /**
+     * Hacker's Keyboard–style layer: Esc, Tab, Ctrl/Alt chords, arrows, F-keys.
+     * Reach with L2 twice from letters when Developer keys is on.
+     */
+    fun developerRows(layout: KeyLayout): List<List<Key>> {
+        val space = if (layout == KeyLayout.GRID) 4f else 5f
+        val side = if (layout == KeyLayout.GRID) 2f else 1.5f
+        val ctrl = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        val alt = KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
+        return listOf(
+            listOf(
+                host("Esc", KeyEvent.KEYCODE_ESCAPE),
+                host("Tab", KeyEvent.KEYCODE_TAB),
+                Key(KeyType.MOD, "Ctrl", meta = ctrl),
+                Key(KeyType.MOD, "Alt", meta = alt),
+                host("Win", KeyEvent.KEYCODE_META_LEFT),
+                host("Ins", KeyEvent.KEYCODE_INSERT),
+                host("Home", KeyEvent.KEYCODE_MOVE_HOME),
+                host("End", KeyEvent.KEYCODE_MOVE_END),
+                host("PgUp", KeyEvent.KEYCODE_PAGE_UP),
+                host("PgDn", KeyEvent.KEYCODE_PAGE_DOWN)
+            ),
+            listOf(
+                host("←", KeyEvent.KEYCODE_DPAD_LEFT),
+                host("↑", KeyEvent.KEYCODE_DPAD_UP),
+                host("↓", KeyEvent.KEYCODE_DPAD_DOWN),
+                host("→", KeyEvent.KEYCODE_DPAD_RIGHT),
+                host("Del", KeyEvent.KEYCODE_FORWARD_DEL),
+                host("F1", KeyEvent.KEYCODE_F1),
+                host("F2", KeyEvent.KEYCODE_F2),
+                host("F3", KeyEvent.KEYCODE_F3),
+                host("F4", KeyEvent.KEYCODE_F4),
+                host("F5", KeyEvent.KEYCODE_F5)
+            ),
+            listOf(
+                host("F6", KeyEvent.KEYCODE_F6),
+                host("F7", KeyEvent.KEYCODE_F7),
+                host("F8", KeyEvent.KEYCODE_F8),
+                host("F9", KeyEvent.KEYCODE_F9),
+                host("F10", KeyEvent.KEYCODE_F10),
+                host("F11", KeyEvent.KEYCODE_F11),
+                host("F12", KeyEvent.KEYCODE_F12)
+            ) + chars("`") + chars("\\") + chars("/"),
+            bottomRow("ABC", space, side)
+        )
+    }
+
+    /** Letter/digit → Android keycode for Ctrl/Alt chords (A–Z, 0–9). */
+    fun hostCodeForLabel(label: String): Int {
+        if (label.length != 1) return 0
+        val c = label[0].uppercaseChar()
+        return when (c) {
+            in 'A'..'Z' -> (c - 'A') + KeyEvent.KEYCODE_A
+            in '0'..'9' -> (c - '0') + KeyEvent.KEYCODE_0
+            else -> 0
+        }
+    }
+
+    private fun host(label: String, code: Int, weight: Float = 1f) =
+        Key(KeyType.HOST, label, weight, hostCode = code)
 
     /**
      * The number pad: four even columns, like a phone's. The last column holds Delete

@@ -321,6 +321,7 @@ data class KeyboardSettings(
     val wordSuggestions: Boolean = true, // words in the tool strip while typing (R3 takes the first)
     val holdAccents: Boolean = true,     // hold A on a letter for its accents
     val numberRow: Boolean = false,      // a slim row of 1 to 0 above the letters
+    val developerKeys: Boolean = false,  // Esc/Tab/Ctrl/Alt/F-keys layer (Hacker's Keyboard–style)
     val split: Boolean = false,          // Split: two windows, one at each side of the screen (wide screens only, never in TV mode)
     val picture: PictureChoice = PictureChoice.AUTO,   // which device the tour, What's new and Button guide show
     val verticalSticks: Boolean = false,  // a vertical handheld that does have sticks
@@ -446,6 +447,7 @@ data class KeyboardSettings(
             .put(K_WORDS, wordSuggestions)
             .put(K_HOLD_ACCENTS, holdAccents)
             .put(K_NUMBER_ROW, numberRow)
+            .put(K_DEVELOPER_KEYS, developerKeys)
             .put(K_SPLIT, split)
             .put(K_PICTURE, picture.name)
             .put(K_VERTICAL_STICKS, verticalSticks)
@@ -537,6 +539,7 @@ data class KeyboardSettings(
         private const val K_WORDS = "word_suggestions"
         private const val K_HOLD_ACCENTS = "hold_accents"
         private const val K_NUMBER_ROW = "number_row"
+        private const val K_DEVELOPER_KEYS = "developer_keys"
         private const val K_SPLIT = "split"
         private const val K_PICTURE = "device_picture"
         private const val K_VERTICAL_STICKS = "vertical_sticks"
@@ -698,6 +701,7 @@ data class KeyboardSettings(
                 wordSuggestions = p.bool(K_WORDS, d.wordSuggestions),
                 holdAccents = p.bool(K_HOLD_ACCENTS, d.holdAccents),
                 numberRow = p.bool(K_NUMBER_ROW, d.numberRow),
+                developerKeys = p.bool(K_DEVELOPER_KEYS, d.developerKeys),
                 split = p.bool(K_SPLIT, d.split),
                 picture = enumOr(p.str(K_PICTURE), d.picture),
                 verticalSticks = p.bool(K_VERTICAL_STICKS, d.verticalSticks),

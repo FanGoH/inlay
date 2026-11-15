@@ -43,6 +43,7 @@ object SettingsFind {
         "Keyboard size" to "bigger larger smaller big small zoom scale size",
         "Key layout" to "grid classic stagger qwerty",
         "Number row" to "numbers digits 1234",
+        "Developer keys" to "hacker keyboard desktop esc escape ctrl tab alt arrows f-keys function win",
         "Split" to "split halves two windows thumbs",
         "Key shape" to "round square corners",
         "Highlight style" to "cursor outline solid glow lift",

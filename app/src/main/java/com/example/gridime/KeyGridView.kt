@@ -25,6 +25,8 @@ class KeyGridView(context: Context) : View(context) {
         fun onText(text: String)
         fun onDelete()
         fun onEnter()
+        /** Host key (Esc, Tab, F-keys, Ctrl/Alt chords). [meta] is a KeyEvent meta mask. */
+        fun onHostKey(keyCode: Int, meta: Int = 0) {}
         fun onTool(tool: Tool)
         /** A tool key held (with A or a finger): only the settings key has a hold, the keyboard picker. */
         fun onToolHold(tool: Tool) {}
@@ -131,12 +133,14 @@ class KeyGridView(context: Context) : View(context) {
     private val toolRow: List<Key> get() = Layouts.toolRow(settings.selectAllButton, if (showWords) words else emptyList(), splitOn, voiceAvailable)
     private var letterRows = Layouts.letterRows(KeyLayout.GRID)
     private var symbolRows = Layouts.symbolRows(KeyLayout.GRID)
+    private var developerRows = Layouts.developerRows(KeyLayout.GRID)
 
     fun applySettings(s: KeyboardSettings) {
         ButtonRoles.apply(s)
         toolStyle = s.toolStyle
         val layoutChanged = s.layout != settings.layout || s.language != settings.language || s.smartKeys != settings.smartKeys ||
-            s.selectAllButton != settings.selectAllButton || s.numberRow != settings.numberRow || s.split != settings.split
+            s.selectAllButton != settings.selectAllButton || s.numberRow != settings.numberRow ||
+            s.developerKeys != settings.developerKeys || s.split != settings.split
         val heightChanged = s.numberRow != settings.numberRow || s.split != settings.split
         resetAccents()
         settings = s
@@ -172,9 +176,11 @@ class KeyGridView(context: Context) : View(context) {
         // A retro theme's button shapes only when you ask for them: the icons you picked say which real button to press
         badges.style = s.shownButtonStyle
         letterRows = Layouts.letterRows(s.layout, s.language, if (s.smartKeys) field else FieldKind.TEXT)
-        symbolRows = Layouts.symbolRows(s.layout, s.language, s.numberRow)
+        symbolRows = Layouts.symbolRows(s.layout, s.language, s.numberRow, s.developerKeys)
+        developerRows = Layouts.developerRows(s.layout)
         if (!s.wordSuggestions) words = emptyList()
         if (layer == Layer.NUMPAD && !numeric) layer = Layer.LETTERS     // smart keys just turned off
+        if (layer == Layer.DEVELOPER && !s.developerKeys) layer = Layer.LETTERS
         val level = s.sizeLevel.coerceIn(0, sizeScales.lastIndex)
         val sizeChanged = level != sizeLevel
         if (sizeChanged) sizeLevel = level
@@ -281,6 +287,8 @@ class KeyGridView(context: Context) : View(context) {
     /** The tour: numbers and symbols showing. */
     val onSymbols get() = layer == Layer.SYMBOLS
     private var heldShift = false          // R2 is held right now
+    /** Sticky Ctrl/Alt meta mask while Developer keys chords are armed. */
+    private var stickyMeta = 0
     private var selRow = 2                 // row 0 is the tool strip
     private var selCol = 4
     private var selecting = false
@@ -306,6 +314,7 @@ class KeyGridView(context: Context) : View(context) {
             Layer.SYMBOLS -> symbolRows
             Layer.CLIPS -> Layouts.clipRows(clips)
             Layer.NUMPAD -> Layouts.numpadRows(field)
+            Layer.DEVELOPER -> developerRows
         }
         // Split: a space bar across the middle becomes two (the tool strip comes ready-made for two windows)
         return listOf(toolRow) + if (splitOn) body.map { Layouts.splitRow(it, splitHalf) } else body
@@ -887,6 +896,9 @@ class KeyGridView(context: Context) : View(context) {
         resetAccents()
         words = emptyList()
         letterRows = Layouts.letterRows(settings.layout, settings.language, if (settings.smartKeys) field else FieldKind.TEXT)
+        symbolRows = Layouts.symbolRows(settings.layout, settings.language, settings.numberRow, settings.developerKeys)
+        developerRows = Layouts.developerRows(settings.layout)
+        stickyMeta = 0
         layer = if (numeric) Layer.NUMPAD else Layer.LETTERS
         selRow = homeRow                                    // middle of the keys
         selCol = if (layer == Layer.NUMPAD) 1 else 4
@@ -1427,7 +1439,8 @@ class KeyGridView(context: Context) : View(context) {
 
     /** Demos: back to the letters, without a sound. */
     fun resetLayer() {
-        if (layer == Layer.LETTERS) return
+        stickyMeta = 0
+        if (layer == Layer.LETTERS) { invalidate(); return }
         layer = Layer.LETTERS
         clampFocus()
         invalidate()
@@ -1444,7 +1457,7 @@ class KeyGridView(context: Context) : View(context) {
     /** Demos: the highlight straight onto the key labelled [label] (no glide), for a picture of one moment. */
     internal fun focusLabelNow(label: String) {
         allRows().forEachIndexed { r, row ->
-            val c = row.indexOfFirst { (it.type == KeyType.CHAR || it.type == KeyType.DIGIT) && displayLabel(it).equals(label, ignoreCase = true) }
+            val c = row.indexOfFirst { (it.type == KeyType.CHAR || it.type == KeyType.DIGIT || it.type == KeyType.HOST || it.type == KeyType.MOD) && displayLabel(it).equals(label, ignoreCase = true) }
             if (c >= 0) { selRow = r; selCol = c; preferredCentre = null; animateFocus(snap = true); return }
         }
     }
@@ -1454,10 +1467,15 @@ class KeyGridView(context: Context) : View(context) {
         if (!fromKey) onDemoInput?.invoke("LT", null)
         val centre = centreOf(allRows()[selRow], selCol)
         layer = when (layer) {
-            // Text boxes: letters <-> symbols. Number boxes go round all three:
-            // number pad -> letters -> symbols -> number pad, so every character is reachable.
+            // Text boxes: letters -> symbols -> (Fn developer keys) -> letters.
+            // Number boxes still cycle the number pad in.
             Layer.LETTERS -> Layer.SYMBOLS.also { feedback?.on() }
-            Layer.SYMBOLS -> (if (numeric) Layer.NUMPAD else Layer.LETTERS).also { feedback?.off() }
+            Layer.SYMBOLS -> when {
+                settings.developerKeys -> Layer.DEVELOPER.also { feedback?.on() }
+                numeric -> Layer.NUMPAD.also { feedback?.off() }
+                else -> Layer.LETTERS.also { feedback?.off() }
+            }
+            Layer.DEVELOPER -> (if (numeric) Layer.NUMPAD else Layer.LETTERS).also { feedback?.off() }
             Layer.NUMPAD -> Layer.LETTERS.also { feedback?.on() }
             Layer.CLIPS -> Layer.LETTERS.also { feedback?.off() }
         }
@@ -1608,7 +1626,7 @@ class KeyGridView(context: Context) : View(context) {
     }
 
     /** Letters and punctuation only. Space, Shift, layer, Delete and Enter already have buttons. */
-    private fun isAnalogTarget(key: Key) = key.type == KeyType.CHAR
+    private fun isAnalogTarget(key: Key) = key.type == KeyType.CHAR || key.type == KeyType.HOST
 
     fun keyboardBounds(): KeyboardRegion {
         return AbsoluteKeyMapper.boundsOf(snapshotKeys())
@@ -1658,14 +1676,40 @@ class KeyGridView(context: Context) : View(context) {
         pulse()
         when (key.type) {
             KeyType.CHAR, KeyType.DIGIT -> {
-                feedback?.key()
                 val text = displayLabel(key)
+                // Ctrl/Alt armed: send as a host key chord instead of committing text.
+                if (stickyMeta != 0) {
+                    val code = Layouts.hostCodeForLabel(text)
+                    if (code != 0) {
+                        feedback?.key()
+                        val meta = stickyMeta
+                        stickyMeta = 0
+                        invalidate()
+                        listener?.onHostKey(code, meta)
+                        return null
+                    }
+                }
+                feedback?.key()
                 if (!heldShift && layer == Layer.LETTERS && shiftState == ShiftState.ONCE && key.type == KeyType.CHAR) {
                     shiftState = ShiftState.OFF
                 }
                 invalidate()
                 listener?.onText(text)
                 return text
+            }
+            KeyType.HOST -> {
+                feedback?.key()
+                val meta = stickyMeta
+                stickyMeta = 0
+                invalidate()
+                listener?.onHostKey(key.hostCode, meta)
+                return null
+            }
+            KeyType.MOD -> {
+                feedback?.key()
+                stickyMeta = if ((stickyMeta and key.meta) == key.meta) stickyMeta and key.meta.inv() else stickyMeta or key.meta
+                invalidate()
+                return null
             }
             KeyType.SPACE -> {
                 feedback?.space()
@@ -2281,7 +2325,9 @@ class KeyGridView(context: Context) : View(context) {
 
     private fun backgroundFor(key: Key): Int? = when (key.type) {
         KeyType.CLIP -> if (key.index == removedClip) null else colKey   // a removed clip leaves an empty place
-        KeyType.CHAR -> colKey
+        KeyType.CHAR, KeyType.HOST -> colKey
+        KeyType.MOD -> if ((stickyMeta and key.meta) == key.meta) colAccentSoft
+            else specials[KeyType.LAYER] ?: colSpecialKey
         KeyType.SPACE -> specials[KeyType.SPACE] ?: colKey      // Grey brick: the controller's dark grey
         KeyType.EMPTY, KeyType.GAP -> null
         KeyType.DIGIT -> null                                // drawn by drawNumberBar: slim keys, their own radius
@@ -2535,12 +2581,12 @@ class KeyGridView(context: Context) : View(context) {
 
         when (key.type) {
             // The number pad's digits are bigger: its keys are a compact block, not a stretched row
-            KeyType.CHAR -> drawLetter(canvas, displayLabel(key), cx, cy, ink, if (layer == Layer.NUMPAD) Design.TYPE_KEY_DIGIT else Design.TYPE_KEY, rect.width())
+            KeyType.CHAR, KeyType.HOST -> drawLetter(canvas, displayLabel(key), cx, cy, ink, if (layer == Layer.NUMPAD) Design.TYPE_KEY_DIGIT else Design.TYPE_KEY, rect.width())
             // The number row: smaller and a touch quieter than letters
             // (on Clear only as quiet as 4.5 : 1 allows: over a white app the fixed step fell to 4.1, 30 Oct 2026)
             KeyType.DIGIT -> drawLabel(canvas, key.label, cx, cy, if (focused) ink else if (clear) quietInk(ink, bg, Design.ALPHA_INK_STRONG) else Contrast.withAlpha(ink, Design.ALPHA_INK_STRONG), Design.TYPE_KEY_ACCENT, 500)
             KeyType.GAP -> Unit
-            KeyType.LAYER -> drawLabel(canvas, key.label, cx, cy, ink, Design.TYPE_KEY_LABEL, 600)
+            KeyType.LAYER, KeyType.MOD -> drawLabel(canvas, key.label, cx, cy, ink, Design.TYPE_KEY_LABEL, 600)
             KeyType.SPACE -> {
                 if (selecting && settings.showHints) {
                     drawChips(canvas, rect, bg, selectChips())

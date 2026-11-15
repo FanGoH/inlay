@@ -1485,6 +1485,12 @@ class SettingsActivity : Activity() {
             ToggleRow(this, "Smart keys", "/ and .com in web addresses, @ in email, a number pad for numbers",
                 settings.smartKeys) {
                 update(settings.copy(smartKeys = it))
+            },
+            ToggleRow(this, "Developer keys",
+                say("Esc, Tab, Ctrl, Alt, arrows and F-keys. Press {L2} twice from letters. Ctrl or Alt then a letter is a shortcut",
+                    remote = "Esc, Tab, Ctrl, Alt, arrows and F-keys. Open numbers and symbols twice to reach them. Ctrl or Alt then a letter is a shortcut"),
+                settings.developerKeys) {
+                update(settings.copy(developerKeys = it))
             }
         )),
         Section("Shortcuts", listOfNotNull(
@@ -1592,6 +1598,8 @@ class SettingsActivity : Activity() {
         if (settings.holdAccents) letters += GuideRow(this, "Accents · hold, then choose", "hold {A}")
         letters += GuideRow(this, "Accent the last letter · press again for more", "{R2} + {Y}")
         letters += GuideRow(this, if (settings.smartKeys) "Numbers and symbols · letters in number-only boxes" else "Numbers and symbols", "{L2}")
+        if (settings.developerKeys)
+            letters += GuideRow(this, "Developer keys · Esc, Tab, Ctrl, arrows, F-keys", "{L2} {L2}")
         if (settings.languages.size > 1)
             letters += GuideRow(this, "Switch language (${settings.languages.joinToString(" → ") { it.label }})", "{R2} + {L2}")
         val words = if (!settings.wordSuggestions) emptyList() else listOf(if (controls.sticks)

@@ -503,6 +503,21 @@ class GridKeyboardService : InputMethodService(), KeyGridView.Listener {
         scheduleAppSync()
     }
 
+    /** Esc/Tab/F-keys and Ctrl/Alt chords from the Developer keys layer. */
+    override fun onHostKey(keyCode: Int, meta: Int) {
+        if (selecting) exitSelectMode(collapse = false)
+        val ic = currentInputConnection
+        if (ic == null) {
+            sendDownUpKeyEvents(keyCode)
+            return
+        }
+        val now = SystemClock.uptimeMillis()
+        val flags = KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta, -1, 0, flags))
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, meta, -1, 0, flags))
+        scheduleAppSync()
+    }
+
     private fun wordEnded() {
         val word = wordBeforeCursor()
         if (word.isEmpty()) return
