@@ -50,7 +50,7 @@ The handoff suggested LT / RT as confirm buttons. Those already mean symbols and
 
 ## Thor Max test checklist
 
-Install the debug APK over the same application id as upstream Inlay (`io.github.dakingeman.inlay`).
+Install the debug APK over a previous **FanGoH** Inlay (`io.github.dakingeman.inlay`). It will not overlay the official signed release — uninstall that first. Before a GitHub prerelease, `versionName` in `app/build.gradle.kts` must match the tag without `v`, and `versionCode` must go up, or Obtainium shows an update that then does nothing.
 
 A debug APK from this branch is produced by `tools/build-debug.sh` at `app/build/outputs/apk/debug/app-debug.apk` (about 13 MB). On an ARM64 Linux host, AGP 9 needs a native `aapt2`; this Pi build used the 37.0.0 binary from [Commit451/android-arm-build-tools](https://github.com/Commit451/android-arm-build-tools) via `android.aapt2FromMavenOverride`.
 

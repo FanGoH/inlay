@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1-rc.3 — Obtainium can install this fork
+
+FanGoH-only. Dual-stick and Developer keys are unchanged.
+
+**Fixes**
+- **The APK now reports 1.3.1-rc.3.** GitHub already had a `v1.3.1-rc.2` tag, but the file inside was still 1.3.0 (version code 6). Obtainium showed an update, downloaded it, then Android refused to install over the same version. This build bumps the version name and version code so Install actually runs.
+
+If Obtainium still does nothing after this, the Inlay already on the device is the official one (different signing key). Uninstall that once, then install this debug APK. Settings reset.
+
 ## 1.3.0 — Split keyboard, your own buttons and a new tour
 
 A new welcome tour that teaches every button by typing, a split keyboard for wide screens, and a setup that learns any controller's buttons. Plus quick symbols, Find in Settings, voice typing, each app's language remembered, and backups.

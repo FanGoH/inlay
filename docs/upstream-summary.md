@@ -42,4 +42,4 @@ Inlay's highlight is a discrete grid cursor driven by `StickDirection` and `Repe
 2. Keep the `KeyboardSettings` fields defaulting to Disabled.
 3. Treat the `GridKeyboardService` / `KeyGridView` / Settings diffs as the only integration surface.
 
-No application-id change: the debug APK installs over official Inlay (`io.github.dakingeman.inlay`).
+Same application id as official Inlay (`io.github.dakingeman.inlay`), but a **different signing cert** (lab Android Debug). The debug APK will **not** install over the official release. Uninstall official Inlay first, or only overlay a previous FanGoH debug build. Keep `versionName` equal to the GitHub tag (without `v`) and bump `versionCode`, or Obtainium will download an “update” that Android then refuses to install.
